@@ -1,0 +1,170 @@
+[204.8100 - 206.6000]	Ses01M_impro07_M033	hap	[3.5000, 2.5000, 1.5000]
+C-E1:	Excited;	()
+C-E2:	Happiness;	()
+C-E6:	Happiness;	()
+C-M1:	Happiness;	()
+A-E1:	val 3; act 2; dom  2;	()
+A-E3:	val 4; act 3; dom  1;	()
+A-M1:	val 4; act 3; dom  3;	()
+
+[5.3661 - 9.6150]	Ses02F_impro01_F000	neu	[4.0000, 3.0000, 2.0000]
+C-E1:	Excited;	()
+C-E2:	Neutral;	()
+C-E6:	Neutral;	()
+C-F2:	Neutral;	()
+A-E3:	val 4; act 2; dom  1;	()
+A-E4:	val 4; act 4; dom  3;	(optimistic, cheerful, polite)
+A-F2:	val 3; act 3; dom  2;	()
+
+[16.4840 - 19.7791]	Ses02F_impro01_F001	sur	[2.0000, 2.5000, 2.5000]
+C-E1:	Excited;	()
+C-E2:	Surprise;	()
+C-E6:	Surprise;	()
+C-F2:	Frustration; Other;	(disbelief)
+A-E3:	val 2; act 2; dom  2;	()
+A-E4:	val 2; act 3; dom  3;	(unpleasantly surprised, attitude, skeptical)
+A-F2:	val 2; act 2; dom  2;	()
+
+[23.3690 - 26.0214]	Ses02F_impro01_F002	xxx	[3.0000, 2.5000, 2.0000]
+C-E1:	Excited;	()
+C-E2:	Neutral;	()
+C-E6:	Frustration;	()
+C-F2:	Other;	(confusion)
+A-E3:	val 3; act 2; dom  2;	()
+A-E4:	val 3; act 3; dom  2;	(pleading)
+A-F2:	val 3; act 3; dom  2;	()
+
+[30.7130 - 32.8369]	Ses02F_impro01_F003	fru	[2.0000, 3.5000, 2.5000]
+C-E1:	Frustration;	()
+C-E2:	Surprise;	()
+C-E6:	Frustration;	()
+C-F2:	Frustration;	()
+A-E3:	val 2; act 3; dom  2;	()
+A-E4:	val 2; act 4; dom  3;	(attitude, worried, accusing)
+A-F2:	val 2; act 2; dom  3;	()
+
+[32.8981 - 37.8800]	Ses02F_impro01_F004	fru	[2.0000, 3.5000, 2.0000]
+C-E1:	Frustration;	()
+C-E2:	Neutral;	()
+C-E6:	Frustration;	()
+C-F2:	Neutral;	()
+A-E3:	val 2; act 3; dom  2;	()
+A-E4:	val 2; act 4; dom  2;	(pleading again)
+A-F2:	val 2; act 3; dom  3;	()
+
+[38.0286 - 40.3056]	Ses02F_impro01_F005	fru	[2.0000, 3.5000, 3.0000]
+C-E1:	Frustration;	()
+C-E2:	Neutral;	()
+C-E6:	Frustration;	()
+C-F2:	;	()
+A-E3:	val 2; act 3; dom  3;	()
+A-E4:	val 2; act 4; dom  3;	(accusing again, but still pleading, upset)
+A-F2:	val 2; act 4; dom  3;	()
+
+[45.0441 - 50.0436]	Ses02F_impro01_F006	fru	[2.0000, 3.0000, 2.5000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Frustration;	()
+C-F2:	Frustration;	()
+A-E3:	val 2; act 2; dom  2;	()
+A-E4:	val 2; act 4; dom  3;	(pleading, upset)
+A-F2:	val 2; act 3; dom  4;	()
+
+[50.0639 - 51.9832]	Ses02F_impro01_F007	fru	[2.0000, 3.0000, 2.0000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Anger;	()
+C-F2:	Frustration;	()
+A-E3:	val 2; act 2; dom  1;	()
+A-E4:	val 2; act 4; dom  3;	(complaining, upset)
+A-F2:	val 2; act 3; dom  2;	()
+
+[57.5135 - 66.6710]	Ses02F_impro01_F008	fru	[2.0000, 4.0000, 1.5000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Frustration; Sadness;	()
+C-F2:	Frustration;	()
+A-E3:	val 2; act 3; dom  1;	()
+A-E4:	val 2; act 5; dom  2;	(excuses, pleading)
+A-F2:	val 2; act 3; dom  4;	()
+
+[66.6912 - 72.0669]	Ses02F_impro01_F009	fru	[1.5000, 3.0000, 2.5000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Frustration;	()
+C-F2:	Other;	(helplessness)
+A-E3:	val 2; act 3; dom  2;	()
+A-E4:	val 1; act 3; dom  3;	(upset)
+A-F2:	val 2; act 2; dom  2;	()
+
+[78.1061 - 87.7428]	Ses02F_impro01_F010	fru	[2.0000, 3.5000, 2.0000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Frustration; Sadness;	()
+C-F2:	Frustration; Anger;	()
+A-E3:	val 2; act 3; dom  1;	()
+A-E4:	val 2; act 4; dom  3;	(more pushy, still pleading, more forceful)
+A-F2:	val 2; act 4; dom  4;	()
+
+[88.3022 - 89.9978]	Ses02F_impro01_F011	fru	[2.0000, 4.0000, 3.0000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Frustration;	()
+C-F2:	Frustration; Anger;	()
+A-E3:	val 2; act 3; dom  2;	()
+A-E4:	val 2; act 5; dom  4;	(upset, feels like he)
+A-F2:	val 2; act 3; dom  4;	()
+
+[96.4709 - 99.7098]	Ses02F_impro01_F012	fru	[2.0000, 3.5000, 2.5000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Other;	(pleading)
+C-F2:	Frustration; Disgust;	()
+A-E3:	val 2; act 3; dom  1;	()
+A-E4:	val 2; act 4; dom  4;	(attitude, feels he)
+A-F2:	val 3; act 3; dom  3;	()
+
+[99.8449 - 105.6836]	Ses02F_impro01_F013	fru	[1.5000, 3.5000, 2.5000]
+C-E1:	Frustration;	()
+C-E2:	Anger;	()
+C-E6:	Frustration; Other;	(pleading)
+C-F2:	Frustration;	()
+A-E3:	val 2; act 3; dom  2;	()
+A-E4:	val 1; act 4; dom  3;	(desperate, upset)
+A-F2:	val 2; act 3; dom  4;	()
+
+[111.5773 - 119.8805]	Ses02F_impro01_F014	fru	[1.5000, 4.0000, 2.0000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Frustration; Sadness;	()
+C-F2:	Frustration; Anger;	()
+A-E3:	val 2; act 4; dom  2;	()
+A-E4:	val 1; act 4; dom  2;	(desperate, pleading, upset)
+A-F2:	val 2; act 4; dom  2;	()
+
+[124.1293 - 132.0469]	Ses02F_impro01_F015	fru	[1.5000, 4.5000, 2.0000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Frustration;	()
+C-F2:	Frustration;	()
+A-E3:	val 2; act 4; dom  1;	()
+A-E4:	val 1; act 5; dom  3;	(begging, trying to guilt him, more forceful)
+A-F2:	val 2; act 4; dom  4;	()
+
+[135.5643 - 145.6458]	Ses02F_impro01_F016	fru	[1.5000, 4.0000, 3.0000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Sadness;	()
+C-F2:	Other;	(rejection)
+A-E3:	val 2; act 3; dom  2;	()
+A-E4:	val 1; act 5; dom  4;	(being difficult, frustrated and upset, stubborn)
+A-F2:	val 2; act 2; dom  1;	()
+
+[145.7064 - 150.8614]	Ses02F_impro01_F017	fru	[1.5000, 3.5000, 2.5000]
+C-E1:	Frustration;	()
+C-E2:	Frustration;	()
+C-E6:	Frustration;	()
+C-F2:	Frustration;	()
+A-E3:	val 2; act 3; dom  2;	()
+A-E4:	val 1; act 4; dom  3;	(pleading, desperate)
+A-F2:	val 2; act 3; dom  4;	()
