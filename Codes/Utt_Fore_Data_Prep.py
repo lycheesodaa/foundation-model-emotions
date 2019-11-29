@@ -62,29 +62,30 @@ class Prepare_UF_Cur_Data:
     
     
     def do_zero_pad_and_save(self, speakerwise_data_dict, Utt_Length, 
-                             step, forcast_wind, context):
-    #This function will do zero-padding
-        print(max(Utt_Length))
+                             step, forcast_wind, context, feature_type='dynamic'):
+    #This function will do zero-padding for dynamic or sequential dataset and save them. If
+    # want the static dataset, no zero-padding is required ! 
+        
         for speaker in range(1,11):
             UF_data = speakerwise_data_dict[speaker]
-            for idx in range(UF_data.shape[0]):
-                UF_data['features'][idx] = np.pad(UF_data['features'][idx], 
-                       ((0, max(Utt_Length)-UF_data['features'][idx].shape[0]), (0,0)), 
-                       'constant', constant_values=0)
-            
-            
+            if feature_type=='dynamic':
+                for idx in range(UF_data.shape[0]):
+                    UF_data['features'][idx] = np.pad(UF_data['features'][idx], 
+                           ((0, max(Utt_Length)-UF_data['features'][idx].shape[0]), (0,0)), 
+                           'constant', constant_values=0)
                 
-            if not os.path.exists('Files/{}_{}_data/step_{}'.format(forcast_wind,
-                                  context, step)):
-                os.makedirs('Files/{}_{}_data/step_{}'.format(forcast_wind,
-                                  context, step))          
-            UF_data.to_pickle('Files/{}_{}_data/step_{}/audio_visual_speaker_{}.csv'.
-                              format(forcast_wind, context, step, speaker))
+            if not os.path.exists('Files/{}_{}_data/step_{}/{}'.format(forcast_wind,
+                                  context, step, feature_type)):
+                os.makedirs('Files/{}_{}_data/step_{}/{}'.format(forcast_wind,
+                                  context, step, feature_type))          
+            UF_data.to_pickle('Files/{}_{}_data/step_{}/{}/audio_visual_speaker_{}.csv'.
+                              format(forcast_wind, context, step, feature_type, speaker))
         
     
         
-    def creating_dataset(self, step=0, normalization=False):
-        """ This function creates the UF data"""
+    def creating_dataset(self, step=0, feature_type='dyanmic', normalization=False):
+        """ This function creates the UF data. If feature_type is set to
+        'static', it will create static data."""
         speakerwise_data = {} #This dict. will save the dataframe for different
         #speaker's processed data
         Utt_Length = [] #This will record the length of utterances to use for zero padding
@@ -97,7 +98,7 @@ class Prepare_UF_Cur_Data:
             #First, let's compare the current utterance and to-be-forecasted
             #utterance. If they are of same speaker and same dialog, record
             #That. Otherwise, ignore.
-            file = os.path.join("Files", "statistical", "audio_visual_speaker_{}.csv".format(speaker))
+            file = os.path.join("Files", "statistical", feature_type, "audio_visual_speaker_{}.csv".format(speaker))
             audio_visual_data = pd.read_pickle(file)
             #remember, the last utterance will not have any labels. This is
             #the reason, we can use utterances upto 
@@ -130,7 +131,7 @@ class Prepare_UF_Cur_Data:
                     print("Normalizing Done")
             speakerwise_data[speaker] = UF_data
             
-        self.do_zero_pad_and_save(speakerwise_data, Utt_Length, step, 'UF', 'Cur')    
+        self.do_zero_pad_and_save(speakerwise_data, Utt_Length, step, 'UF', 'Cur', feature_type)    
     
 
 class Prepare_UF_history_Data(Prepare_UF_Cur_Data):
@@ -207,10 +208,6 @@ class Prepare_UF_history_Data(Prepare_UF_Cur_Data):
         self.do_zero_pad_and_save(speakerwise_data, Utt_Length, step, 'UF', 'His') 
                         
    
-#Main function for test only
-        
-#UF_cur = Prepare_UF_Cur_Data()
-#UF_cur.creating_dataset(step=1, normalization=True)
-#UF_his = Prepare_UF_history_Data()
-#UF_his.creating_dataset(step=1, normalization=True)
 
+UF_cur = Prepare_UF_Cur_Data()
+UF_cur.creating_dataset(step=1, feature_type='static', normalization=True)
