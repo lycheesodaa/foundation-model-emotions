@@ -21,6 +21,7 @@ class combining_AV:
     def __init__(self, audio_feature_loacation, video_feature_location):
         self.audio_feature_loacation = audio_feature_loacation
         self.video_feature_location = video_feature_location
+        print('Combining the feature set...')
     
     def load_files(self, session, name):
         
