@@ -33,19 +33,19 @@ class window_based_reformation:
         if window_type=='dynamic':
             i = 0
             j = 0
-            while j<framelength-1:
+            while j<framelength:
                 if (i + frame_idx -1)<framelength:
-                    index_list.append([i, i+frame_idx-1])
+                    index_list.append([i, i+frame_idx])
                     j = i+frame_idx-1
                 else:
-                    index_list.append([i, framelength-1])
+                    index_list.append([i, framelength])
                     break
                 i+=overlap
         elif window_type=='static':
-            index_list = [[0, framelength-1]]
+            
+            index_list = [[0, framelength]]
         return index_list
         
-    
     
     def process_data(self, window_type):
         """
@@ -61,6 +61,8 @@ class window_based_reformation:
                 index_list = self.make_window_idx(audio_visual_framewise['audio'][utterance].shape[0], 30, 15, window_type)
                 features_concatenated = np.concatenate((audio_visual_framewise['audio'][utterance], 
                                                         audio_visual_framewise['video'][utterance]), axis = 1)
+                if utterance==196:
+                    print(features_concatenated)
             # Extract statistical information from window-based data
                 window_wise_feature = np.zeros((len(index_list), 895)) # Although 179 features, 5 statistical feature from each of them. 
                 for idx in range(len(index_list)):
@@ -72,23 +74,23 @@ class window_based_reformation:
                                                        np.quantile(parsed_features, 0.75, axis=0).reshape(1, 179) - 
                                                        np.quantile(parsed_features, 0.25, axis=0).reshape(1, 179)), axis=1)
                     window_wise_feature[idx, :] = statistical_feat
-                    print('speaker is {} and data is {}, len of the idx is{}'.format(speaker, idx, len(index_list)))
+                    print('speaker is {} and data is {}, len of the idx is{}'.format(speaker, utterance, len(index_list)))
                 feature_set = {'name': audio_visual_framewise['name'][utterance], 
                                'stat_features':window_wise_feature, 
                                'label':audio_visual_framewise['label'][utterance]}
                 Audio_Visual = Audio_Visual.append(feature_set, ignore_index=True)
                 
-            if not os.path.exists('Files/statistical'):
-                os.mkdir('Files/statistical')          
-            Audio_Visual.to_pickle('Files/statistical/audio_visual_speaker_{}.csv'.format(speaker)) 
+            if not os.path.exists('Files/statistical/{}'.format(window_type)):
+                os.makedirs('Files/statistical/{}'.format(window_type))          
+            Audio_Visual.to_pickle('Files/statistical/{}/audio_visual_speaker_{}.csv'.format(window_type, speaker)) 
                     
                     
                     
                     
 #Main function fpr test only
 
-#task = window_based_reformation('Files/sameframe', window_type='dynamic')
-#task.process_data()               
+#task = window_based_reformation('Files/sameframe')
+#task.process_data('static')               
             
             
             
