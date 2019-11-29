@@ -17,7 +17,8 @@ class Prepare_UF_Cur_Data:
     and UF-his approach
     """
     def __init__(self):
-        pass
+        print('Creating dataset for utterance forecasting...')
+        
     
     def organize_IEMOCAP_info(self, info_file='IEMOCAP_EmoEvaluation.txt'):
         """
