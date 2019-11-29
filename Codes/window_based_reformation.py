@@ -19,6 +19,7 @@ class window_based_reformation:
     
     def __init__(self, file_location):
         self.file_location = file_location
+        print('Creating window based features...')
         
     def make_window_idx(self, framelength, frame_idx, overlap, window_type):
         """
