@@ -21,16 +21,18 @@ from keras.layers import Bidirectional
 from keras.layers import Masking
 from keras.layers import Dropout
 
-class run_sequential_learning:
+class run_deep_learning:
     """
     This class will run the deep learning algorithms, LSTM and BLSTM
     from the speakerwise processed data
     """
-    def __self__(self, algorithm):
-        self.algorithm = algorithm
-        
-    def prepare_data(self, directory):
+    def __self__(self):
+        pass
+
+
+    def prepare_data(self, directory, feature_type='dynamic'):
         #Function prepares data from the saved DataFrame
+        #if feature_type is set to 'static', it will not require the reshape. 
         Features = {} #This dictionary will stack the features across different speaker
         Labels = [] # List for stacking forecasting labels
         Speakers = [] #List for tracking speaker id
@@ -50,9 +52,10 @@ class run_sequential_learning:
         data_instances = len(Labels)
         sequence_length = int(Full_feature_set.shape[0]/data_instances)
         feature_dimension = 895
-        Full_feature_set = Full_feature_set.reshape(data_instances, 
-                                                    sequence_length, 
-                                                    feature_dimension)
+        if feature_type=='dynamic':
+            Full_feature_set = Full_feature_set.reshape(data_instances, 
+                                                        sequence_length, 
+                                                        feature_dimension)
         return Full_feature_set, np.asarray(Labels), np.asarray(Speakers)
     
     
@@ -62,8 +65,8 @@ class run_sequential_learning:
         """
         logo = LeaveOneGroupOut()
         #code for LSTM model
-        LSTM_predict = {} #saves the softmax output
-        LSTM_test = {} #saves the test set GTs
+        LSTM_predict_probability = {} #saves the softmax output
+        LSTM_test_GT = {} #saves the test set GTs
         LSTM__modelpred = {} #saves the final outputs
         LSTM_con = {} #saves the confusion matrix per speaker
         LSTM_UWR = {} #saves the unweighted recall per speaker
@@ -74,11 +77,11 @@ class run_sequential_learning:
             callbacks= [EarlyStopping(monitor='val_loss', patience=10)]    
             model = Sequential()
             model.add(Masking(mask_value=0., input_shape=(features.shape[1], features.shape[2])))
-            if model_type=='BLSTM':
+            if model_type=='unidirectional':
                 model.add(Bidirectional(LSTM(128, return_sequences=True)))
                 model.add(Dropout(0.5))
                 model.add(Bidirectional(LSTM(128)))
-            elif model_type=='LSTM':
+            elif model_type=='bidirectional':
                 model.add(LSTM(128, return_sequences=True))
                 model.add(Dropout(0.5))
                 model.add(LSTM(128))
@@ -93,17 +96,48 @@ class run_sequential_learning:
             model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
             model.fit(features[train], label_train,  epochs=50, validation_split=0.20, callbacks=callbacks, batch_size=128, verbose=1)
             X_pred = model.predict(features[test,:])
-            LSTM_predict[speaker] = X_pred
-            LSTM_test[speaker] = labels[test]
+            LSTM_predict_probability[speaker] = X_pred
+            LSTM_test_GT[speaker] = labels[test]
             Y_pred = np.argmax(X_pred, axis=1)
             LSTM_con[speaker] = confusion_matrix(labels[test],Y_pred)
-            LSTM_UWR[speaker] = recall_score(labels[test],Y_pred, average='macro') 
-            LSTM_predict[speaker] = X_pred
-            LSTM_test[speaker] = labels[test]
-            LSTM__modelpred[speaker] = Y_pred
+            LSTM_UWR[speaker] = recall_score(labels[test], Y_pred, average='macro') 
             LSTM__modelpred[speaker] = Y_pred
             speaker+=1
-        
+        return LSTM_test_GT, LSTM__modelpred, LSTM_predict_probability
+    
+    
+    def FC_DNN(self, features, labels, speaker_id):
+        """
+        This block will just create the FC-DNN cells and produce output
+        """
+        logo = LeaveOneGroupOut()
+        #code for LSTM model
+        FCDNN_predict_probability = {} #saves the softmax output
+        FCDNN_test_GT = {} #saves the test set GTs
+        FCDNN__modelpred = {} #saves the final outputs
+        speaker = 0
+        for train, test in logo.split(features, labels, speaker_id):
+            label_train = np_utils.to_categorical(labels[train])
+            # Set callback functions to early stop training 
+            callbacks= [EarlyStopping(monitor='val_loss', patience=10)]    
+            model = Sequential()
+            model.add(Dense(256, activation='relu'))
+            model.add(Dropout(0.5))
+            model.add(Dense(256, activation='relu'))
+            model.add(Dropout(0.5))
+            model.add(Dense(256, activation='relu'))
+            model.add(Dropout(0.5))##
+            model.add(Dense(4, activation='softmax'))
+            adam=keras.optimizers.Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)   
+            model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
+            model.fit(features[train], label_train,  epochs=50, validation_split=0.20, callbacks=callbacks, batch_size=128, verbose=1)
+            X_pred = model.predict(features[test,:])
+            FCDNN_predict_probability[speaker] = X_pred
+            FCDNN_test_GT[speaker] = labels[test]
+            Y_pred = np.argmax(X_pred, axis=1)
+            FCDNN__modelpred[speaker] = Y_pred
+            speaker+=1
+        return FCDNN_test_GT, FCDNN__modelpred, FCDNN_predict_probability        
             
         
             
