@@ -1,6 +1,6 @@
 # Emotion-Forecasting
 **This respository contains code and step-by-step guide for completing the Emotion Forecasting Project.**
-
+## Background:
 Emotion forecasting is the task of predicting the future emotion of a speaker-i.e., the emotion label of the future speaking turn-based on the speaker's past and current audiovisual cues. Emotion forecasting systems require new problem formulations that differ from traditional emotion recognition systems.
 
 1. Emotion Forecasting is different from emotion recognition problem. Emotion recognition analyze the current hehavioral cues and then predicts the current emotion (either classify or do regression). Emotion forecasting analyze the current data and predicts the __future__ emotion in a conversation. 
@@ -10,6 +10,25 @@ a. Sequential features work better than static features.
 b. If along with current features, the features from previous history utterance is taken, forecasting performance will be better.
 3. For hypothesis (a), Ww use Fully-Connected Deep Neural Network (FC-DNN) for analyzing with static feature set as **baseline** model to compare the static vs dynamic modeling. We use Long Short-Term Memory (LSTM) and Bidirectional Long Short-Term Memory (BLSTM) to compare the performance. For hypothesis (b), we use LSTM and BLSTM __without__ history as baseline. Then we add history to our featureset and perform forecasting with __added__ history. 
 4. Our experimental results on the IEMOCAP benchmark dataset demonstrate that BLSTM and LSTM outperform FC-DNN by up to 2.42% in unweighted recall. When using both the current and past utterances, deep dynamic models show an improvement of up to 2.39% compared to their performance when using only the current utterance.
+
+**The following table gives an overview of our work**
+| Tables        | Are           | Cool  |
+| ------------- |:-------------:| -----:|
+| col 3 is      | right-aligned | $1600 |
+| col 2 is      | centered      |   $12 |
+| zebra stripes | are neat      |    $1 |
+
+
+
+
+## Methodology
+
+### Feature Extraction:
+In this project, we use audio-visual data for emotion forecasting. We extract the prosodic information from speech namely pitch, MFCC, intensity, MFB. For visual data, we use 3-d coordinates of facial landmark points of 55 facial points. 
+1. We use the ```hndfkjekf.praat``` to extract audio features.
+2. The dataset provides the facial feature information with a ```.mat``` for each speaker. 
+
+
 
 
 ## References:
