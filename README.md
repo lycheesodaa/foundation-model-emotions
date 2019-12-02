@@ -34,7 +34,6 @@ b. If along with current features, the features from previous history utterance 
 |  Combine_audiovisual_data.py| Combine the audio-visual information, filling out the missing values and clean the data for feature engineering. Produce a table for each participant (speaker) at the end  |
 | window_based_reformation.py | Produce statistical features from raw audio-visual information. Doing necessary feature engineering |
 | Utt_Fore_Data_Prep.py   | Preparing the dataset for different step utetrance forecasting. Also prepares the dataset for both history-less and history-added version of emotion forecasting. Expplained in ![History-Less Emotion Forecasting](/images/cur.pdf) and [History-Added emotion forecasting](/images/his.pdf) |
-
 | run_algorithms.py | Contains classes to run FC-DNN, LSTM and BLSTM |
 
 
