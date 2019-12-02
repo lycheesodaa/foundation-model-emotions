@@ -41,7 +41,7 @@ b. If along with current features, the features from previous history utterance 
 
 
 
-For more details, please refer to our work ![here](https://ieeexplore.ieee.org/document/8756599)
+For more details, please refer to our work [here](https://ieeexplore.ieee.org/document/8756599)
 
 
 
