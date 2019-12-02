@@ -26,7 +26,7 @@ b. If along with current features, the features from previous history utterance 
 | Major libraries for data analysis | Numpy, Scipy, Pandas, re |
 | ML libraries | Keras, Scikit-learn |
 
-**Below is the code structure for the project*
+**Below is the code structure for the project**
 
 | Code file | Task |
 | ------------- | ------------- |
@@ -35,16 +35,13 @@ b. If along with current features, the features from previous history utterance 
 | window_based_reformation.py | Produce statistical features from raw audio-visual information. Doing necessary feature engineering |
 | Utt_Fore_Data_Prep.py   | Preparing the dataset for different step utetrance forecasting. Also prepares the dataset for both history-less and history-added version of emotion forecasting. Expplained in ![History-Less Emotion Forecasting](/images/cur.pdf) and [History-Added emotion forecasting](/images/his.pdf) |
 | run_algorithms.py | Contains classes to run FC-DNN, LSTM and BLSTM |
+|  	Main_Process_with_visualization.ipynb | Provides details of how to work on a specific cases of emotion forecasting. Contains visualization of result and time-impact of forecasting |
+| Performance_Comparison_Visualization.ipynb | Shows the comparison of performance by testing our two hypotheis |
 
 
 
 
-## Methodology
-
-### Feature Extraction:
-In this project, we use audio-visual data for emotion forecasting. We extract the prosodic information from speech namely pitch, MFCC, intensity, MFB. For visual data, we use 3-d coordinates of facial landmark points of 55 facial points. 
-1. We use the ```audio_feat_extract.praat``` to extract audio features.
-2. The dataset provides the facial feature information with a ```.mat``` for each speaker. 
+For more details, please refer to our work ![here](https://ieeexplore.ieee.org/document/8756599)
 
 
 
