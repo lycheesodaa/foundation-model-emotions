@@ -9,7 +9,7 @@ We have two important hypothesis, that we test through the experiments:
 a. Sequential features work better than static features.
 b. If along with current features, the features from previous history utterance is taken, forecasting performance will be better.
  
-3. For hypothesis (a), Ww use Fully-Connected Deep Neural Network (FC-DNN) for analyzing with static feature set as **baseline** model to compare the static vs dynamic modeling. We use Long Short-Term Memory (LSTM) and Bidirectional Long Short-Term Memory (BLSTM) to compare the performance. For hypothesis (b), we use LSTM and BLSTM __without__ history as baseline. Then we add history to our featureset and perform forecasting with __added__ history. 
+3. For hypothesis (a), We use Fully-Connected Deep Neural Network (FC-DNN) for analyzing with static feature set as **baseline** model to compare the static vs dynamic modeling. We use Long Short-Term Memory (LSTM) and Bidirectional Long Short-Term Memory (BLSTM) to compare the performance. For hypothesis (b), we use LSTM and BLSTM __without__ history as baseline. Then we add history to our featureset and perform forecasting with __added__ history. 
 4. Our experimental results on the IEMOCAP benchmark dataset demonstrate that BLSTM and LSTM outperform FC-DNN by up to 2.42% in unweighted recall. When using both the current and past utterances, deep dynamic models show an improvement of up to 2.39% compared to their performance when using only the current utterance.
 
 **The following table gives an overview of our work**
@@ -33,8 +33,8 @@ b. If along with current features, the features from previous history utterance 
 | audio_feat_extract.praat    | Extract audio features from raw ```.wav``` files |
 |  Combine_audiovisual_data.py| Combine the audio-visual information, filling out the missing values and clean the data for feature engineering. Produce a table for each participant (speaker) at the end  |
 | window_based_reformation.py | Produce statistical features from raw audio-visual information. Doing necessary feature engineering |
-| Utt_Fore_Data_Prep.py   | Preparing the dataset for different step utetrance forecasting. Also prepares the dataset for both history-less and history-added version of emotion forecasting. Expplained in ![History-Less Emotion Forecasting](/images/cur.pdf)
-and [History-Added emotion forecasting](/images/his.pdf)|
+| Utt_Fore_Data_Prep.py   | Preparing the dataset for different step utetrance forecasting. Also prepares the dataset for both history-less and history-added version of emotion forecasting. Expplained in ![History-Less Emotion Forecasting](/images/cur.pdf)|
+
 | run_algorithms.py | Contains classes to run FC-DNN, LSTM and BLSTM|
 
 
