@@ -1,315 +1,343 @@
 #Praat skeleton code for audio feature extraction
 
-[female]
+#[female]
 
-directory$ = "Processed/Female/"
+directory$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Female/"
 
-outdir$ = "Processed/Features/"
+outdir$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Features/"
 
 extension$ = ".wav"
 
  
+# Create a strings list to store folder names
+Create Strings as directory list: "folderList", directory$
+numberOfFolders = Get number of strings
 
-Create Strings as file list... list 'directory$'*'extension$'
+# Iterate through each folder
+for i from 1 to numberOfFolders
+    selectObject: "Strings folderList"
+    folderName$ = Get string: i
+    folderPath$ = directory$ + "/" + folderName$
+    
+    # Process the folder here
+    appendInfoLine: "Processing folder: ", folderName$
 
-number_files = Get number of strings
+    
+    Create Strings as file list: "list", folderPath$ + "/*" + extension$
 
- 
+    number_files = Get number of strings
+    appendInfoLine: "  Found ", number_files, " wav files"
 
-for a from 1 to number_files
+    for a from 1 to number_files
 
-                select Strings list
+        select Strings list
 
-                current_file$ = Get string... 'a'
+        current_file$ = Get string... 'a'
+        appendInfoLine: "    Processing ", current_file$
 
-                Read from file... 'directory$''current_file$'
+        Read from file... 'folderPath$'/'current_file$'
 
-                object_name$ = selected$("Sound")
+        object_name$ = selected$("Sound")
 
- 
 
-                To Intensity... 100 0.01 no
 
-                Down to Matrix
+        To Intensity... 100 0.01 no
 
-                Transpose
+        Down to Matrix
 
-                Write to matrix text file... 'outdir$'/'object_name$'.intensity
+        Transpose
 
-                Remove
+        Write to matrix text file... 'outdir$'/'object_name$'.intensity
 
-                select Matrix 'object_name$'
+        Remove
 
-                Remove
+        select Matrix 'object_name$'
 
-                select Intensity 'object_name$'
+        Remove
 
-                Remove
+        select Intensity 'object_name$'
 
- 
+        Remove
 
-                select Sound 'object_name$'
 
-                To Pitch (ac)... 0.01 100 15 no 0.03 0.45 0.01 0.35 0.14 600
 
-                select Pitch 'object_name$'
+        select Sound 'object_name$'
 
-                Smooth... 10
+        To Pitch (ac)... 0.01 100 15 no 0.03 0.45 0.01 0.35 0.14 600
 
-                Interpolate
+        select Pitch 'object_name$'
 
-                To Matrix
+        Smooth... 10
 
-                Transpose
+        Interpolate
 
-                Write to matrix text file... 'outdir$'/'object_name$'.pitch
+        To Matrix
 
-                Remove
+        Transpose
 
-                select Matrix 'object_name$'
+        Write to matrix text file... 'outdir$'/'object_name$'.pitch
 
-                Remove
+        Remove
 
-                select Pitch 'object_name$'
+        select Matrix 'object_name$'
 
-                Remove
+        Remove
 
-                select Pitch 'object_name$'
+        select Pitch 'object_name$'
 
-                Remove
+        Remove
 
-                select Pitch 'object_name$'
+        select Pitch 'object_name$'
 
-                Remove
+        Remove
 
- 
+        select Pitch 'object_name$'
 
-                select Sound 'object_name$'
+        Remove
 
-                To Harmonicity (ac)... 0.01 100 0.1 4.5
 
-                To Matrix
 
-                Transpose
+        select Sound 'object_name$'
 
-                Write to matrix text file... 'outdir$'/'object_name$'.hnr
+        To Harmonicity (ac)... 0.01 100 0.1 4.5
 
-                Remove
+        To Matrix
 
-                select Matrix 'object_name$'
+        Transpose
 
-                Remove
+        Write to matrix text file... 'outdir$'/'object_name$'.hnr
 
-                select Harmonicity 'object_name$'
+        Remove
 
-                Remove
+        select Matrix 'object_name$'
 
- 
+        Remove
 
-                select Sound 'object_name$'
+        select Harmonicity 'object_name$'
 
-                To MFCC... 13 0.025 0.01 100 100 0
+        Remove
 
-                To Matrix
 
-                Transpose
 
-                Write to matrix text file... 'outdir$'/'object_name$'.mfcc
+        select Sound 'object_name$'
 
-                Remove
+        To MFCC... 13 0.025 0.01 100 100 0
 
-                select Matrix 'object_name$'
+        To Matrix
 
-                Remove
+        Transpose
 
-                select MFCC 'object_name$'
+        Write to matrix text file... 'outdir$'/'object_name$'.mfcc
 
-                Remove
+        Remove
 
- 
+        select Matrix 'object_name$'
 
-                select Sound 'object_name$'
+        Remove
 
-                To MelFilter... 0.025 0.01 100 100 0
+        select MFCC 'object_name$'
 
-                To Matrix
+        Remove
 
-                Transpose
 
-                Write to matrix text file... 'outdir$'/'object_name$'.mfb
 
-                Remove
+        select Sound 'object_name$'
 
-                select Matrix 'object_name$'
+        To MelFilter... 0.025 0.01 100 100 0
 
-                Remove
+        To Matrix
 
-                select MelFilter 'object_name$'
+        Transpose
 
-                Remove
+        Write to matrix text file... 'outdir$'/'object_name$'.mfb
 
-                select Sound 'object_name$'
+        Remove
 
-                Remove
+        select Matrix 'object_name$'
 
+        Remove
+
+        select MelFilter 'object_name$'
+
+        Remove
+
+        select Sound 'object_name$'
+
+        Remove
+    endfor
 endfor
-
  
 
-[male]
+# [male]
 
 # This script measures intensity every 10ms
 
  
 
-directory$ = "/Users/emilykmp/Documents/Research/IEMOCAP_Data/Male_Speakers/"
+directory$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Male/"
 
-outdir$ = "/Users/emilykmp/Documents/Research/IEMOCAP_Data/Features/"
+outdir$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Features/"
 
 extension$ = ".wav"
 
  
 
-Create Strings as file list... list 'directory$'*'extension$'
-
-number_files = Get number of strings
-
  
+# Create a strings list to store folder names
+Create Strings as directory list: "folderList", directory$
+numberOfFolders = Get number of strings
 
-for a from 1 to number_files
+# Iterate through each folder
+for i from 1 to numberOfFolders
+    selectObject: "Strings folderList"
+    folderName$ = Get string: i
+    folderPath$ = directory$ + "/" + folderName$
+    
+    # Process the folder here
+    appendInfoLine: "Processing folder: ", folderName$
 
-                select Strings list
+    
+    Create Strings as file list: "list", folderPath$ + "/*" + extension$
 
-                current_file$ = Get string... 'a'
+    number_files = Get number of strings
+    appendInfoLine: "  Found ", number_files, " wav files"
 
-                Read from file... 'directory$''current_file$'
+    for a from 1 to number_files
 
-                object_name$ = selected$("Sound")
+        select Strings list
 
- 
+        current_file$ = Get string... 'a'
+        appendInfoLine: "    Processing ", current_file$
 
-                To Intensity... 75 0.01 no
+        Read from file... 'folderPath$'/'current_file$'
 
-                Down to Matrix
+        object_name$ = selected$("Sound")
 
-                Transpose
 
-                Write to matrix text file... 'outdir$'/'object_name$'.intensity
 
-                Remove
+        To Intensity... 75 0.01 no
 
-                select Matrix 'object_name$'
+        Down to Matrix
 
-                Remove
+        Transpose
 
-                select Intensity 'object_name$'
+        Write to matrix text file... 'outdir$'/'object_name$'.intensity
 
-                Remove
+        Remove
 
- 
+        select Matrix 'object_name$'
 
-                select Sound 'object_name$'
+        Remove
 
-                To Pitch (ac)... 0.01 75 15 no 0.03 0.45 0.01 0.35 0.14 600
+        select Intensity 'object_name$'
 
-                select Pitch 'object_name$'
+        Remove
 
-                Smooth... 10
 
-                Interpolate
 
-                To Matrix
+        select Sound 'object_name$'
 
-                Transpose
+        To Pitch (ac)... 0.01 75 15 no 0.03 0.45 0.01 0.35 0.14 600
 
-                Write to matrix text file... 'outdir$'/'object_name$'.pitch
+        select Pitch 'object_name$'
 
-                Remove
+        Smooth... 10
 
-                select Matrix 'object_name$'
+        Interpolate
 
-                Remove
+        To Matrix
 
-                select Pitch 'object_name$'
+        Transpose
 
-                Remove
+        Write to matrix text file... 'outdir$'/'object_name$'.pitch
 
-                select Pitch 'object_name$'
+        Remove
 
-                Remove
+        select Matrix 'object_name$'
 
-                select Pitch 'object_name$'
+        Remove
 
-                Remove
+        select Pitch 'object_name$'
 
- 
+        Remove
 
-                select Sound 'object_name$'
+        select Pitch 'object_name$'
 
-                To Harmonicity (ac)... 0.01 75 0.1 4.5
+        Remove
 
-                To Matrix
+        select Pitch 'object_name$'
 
-                Transpose
+        Remove
 
-                Write to matrix text file... 'outdir$'/'object_name$'.hnr
 
-                Remove
 
-                select Matrix 'object_name$'
+        select Sound 'object_name$'
 
-                Remove
+        To Harmonicity (ac)... 0.01 75 0.1 4.5
 
-                select Harmonicity 'object_name$'
+        To Matrix
 
-                Remove
+        Transpose
 
- 
+        Write to matrix text file... 'outdir$'/'object_name$'.hnr
 
-                select Sound 'object_name$'
+        Remove
 
-                To MFCC... 13 0.025 0.01 100 100 0
+        select Matrix 'object_name$'
 
-                To Matrix
+        Remove
 
-                Transpose
+        select Harmonicity 'object_name$'
 
-                Write to matrix text file... 'outdir$'/'object_name$'.mfcc
+        Remove
 
-                Remove
 
-                select Matrix 'object_name$'
 
-                Remove
+        select Sound 'object_name$'
 
-                select MFCC 'object_name$'
+        To MFCC... 13 0.025 0.01 100 100 0
 
-                Remove
+        To Matrix
 
- 
+        Transpose
 
-                select Sound 'object_name$'
+        Write to matrix text file... 'outdir$'/'object_name$'.mfcc
 
-                To MelFilter... 0.025 0.01 100 100 0
+        Remove
 
-                To Matrix
+        select Matrix 'object_name$'
 
-                Transpose
+        Remove
 
-                Write to matrix text file... 'outdir$'/'object_name$'.mfb
+        select MFCC 'object_name$'
 
-                Remove
+        Remove
 
-                select Matrix 'object_name$'
 
-                Remove
 
-                select MelFilter 'object_name$'
+        select Sound 'object_name$'
 
-                Remove
+        To MelFilter... 0.025 0.01 100 100 0
 
-                select Sound 'object_name$'
+        To Matrix
 
-                Remove
+        Transpose
 
-Endfor
+        Write to matrix text file... 'outdir$'/'object_name$'.mfb
+
+        Remove
+
+        select Matrix 'object_name$'
+
+        Remove
+
+        select MelFilter 'object_name$'
+
+        Remove
+
+        select Sound 'object_name$'
+
+        Remove
+
+    endfor
+endfor
