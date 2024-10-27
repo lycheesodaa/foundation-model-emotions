@@ -4,7 +4,7 @@
 
 directory$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Female/"
 
-outdir$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Features/"
+outdir$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Features_50_25/"
 
 extension$ = ".wav"
 
@@ -41,7 +41,7 @@ for i from 1 to numberOfFolders
 
 
 
-        To Intensity... 100 0.01 no
+        To Intensity... 100 0.025 no
 
         Down to Matrix
 
@@ -63,7 +63,7 @@ for i from 1 to numberOfFolders
 
         select Sound 'object_name$'
 
-        To Pitch (ac)... 0.01 100 15 no 0.03 0.45 0.01 0.35 0.14 600
+        To Pitch (ac)... 0.025 100 15 no 0.03 0.45 0.01 0.35 0.14 600
 
         select Pitch 'object_name$'
 
@@ -99,7 +99,7 @@ for i from 1 to numberOfFolders
 
         select Sound 'object_name$'
 
-        To Harmonicity (ac)... 0.01 100 0.1 4.5
+        To Harmonicity (ac)... 0.025 100 0.1 4.5
 
         To Matrix
 
@@ -121,7 +121,7 @@ for i from 1 to numberOfFolders
 
         select Sound 'object_name$'
 
-        To MFCC... 13 0.025 0.01 100 100 0
+        To MFCC... 13 0.050 0.025 100 100 0
 
         To Matrix
 
@@ -143,7 +143,7 @@ for i from 1 to numberOfFolders
 
         select Sound 'object_name$'
 
-        To MelFilter... 0.025 0.01 100 100 0
+        To MelFilter... 0.050 0.025 100 100 0
 
         To Matrix
 
@@ -176,7 +176,7 @@ endfor
 
 directory$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Male/"
 
-outdir$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Features/"
+outdir$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Features_50_25/"
 
 extension$ = ".wav"
 
@@ -215,7 +215,7 @@ for i from 1 to numberOfFolders
 
 
 
-        To Intensity... 75 0.01 no
+        To Intensity... 75 0.025 no
 
         Down to Matrix
 
@@ -237,7 +237,7 @@ for i from 1 to numberOfFolders
 
         select Sound 'object_name$'
 
-        To Pitch (ac)... 0.01 75 15 no 0.03 0.45 0.01 0.35 0.14 600
+        To Pitch (ac)... 0.025 75 15 no 0.03 0.45 0.01 0.35 0.14 600
 
         select Pitch 'object_name$'
 
@@ -273,7 +273,7 @@ for i from 1 to numberOfFolders
 
         select Sound 'object_name$'
 
-        To Harmonicity (ac)... 0.01 75 0.1 4.5
+        To Harmonicity (ac)... 0.025 75 0.1 4.5
 
         To Matrix
 
@@ -295,7 +295,7 @@ for i from 1 to numberOfFolders
 
         select Sound 'object_name$'
 
-        To MFCC... 13 0.025 0.01 100 100 0
+        To MFCC... 13 0.050 0.025 100 100 0
 
         To Matrix
 
@@ -317,7 +317,7 @@ for i from 1 to numberOfFolders
 
         select Sound 'object_name$'
 
-        To MelFilter... 0.025 0.01 100 100 0
+        To MelFilter... 0.050 0.025 100 100 0
 
         To Matrix
 
