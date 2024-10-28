@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Nov 15 14:41:12 2019
-
-@author: sadat
-"""
 import scipy.io as sio
 import pandas as pd
 from scipy import interpolate
