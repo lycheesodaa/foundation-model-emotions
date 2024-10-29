@@ -49,7 +49,17 @@ def fill_missing_value_simple(df):
     Simpler version using pandas built-in interpolation methods.
     This will do interpolation along each column independently.
     """
-    return df.interpolate(method="cubic", limit_direction="both")
+    result_df = df.interpolate(method="cubic", limit_direction="both")    
+    
+    # Check for remaining NaN values (can occur at edges or with sparse data)
+    if result_df.isna().any().any():
+        result_df = result_df.ffill().bfill()
+    
+    # Final check for any remaining NaN values
+    if result_df.isna().any().any():
+        raise RuntimeError("Failed to fill all missing values. Please try a different fallback_method.")
+    
+    return result_df
 
 
 def fill_missing_values_df(df, threshold=0.3, fallback_method='ffill'):
@@ -116,9 +126,9 @@ def fill_missing_values_df(df, threshold=0.3, fallback_method='ffill'):
     # Check for remaining NaN values (can occur at edges or with sparse data)
     if result_df.isna().any().any():
         if fallback_method == 'ffill':
-            result_df = result_df.fillna(method='ffill').fillna(method='bfill')
+            result_df = result_df.ffill().bfill()
         elif fallback_method == 'bfill':
-            result_df = result_df.fillna(method='bfill').fillna(method='ffill')
+            result_df = result_df.bfill().ffill()
         elif fallback_method == 'mean':
             result_df = result_df.fillna(result_df.mean())
         elif fallback_method == 'median':
