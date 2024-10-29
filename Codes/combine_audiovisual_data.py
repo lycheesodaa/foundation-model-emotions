@@ -1,12 +1,10 @@
-import scipy.io as sio
 import pandas as pd
 from scipy import interpolate
 import numpy as np
-import pickle
 import re
 import os
 from pathlib import Path
-from window_based_reformation import _validate_features, check_null_values
+from window_based_reformation import check_null_values
 
 # numbers represent LLID, RLID, MH, MNOSE, LNSTRL, TNOSE, RNSTRL, LHD and RHD respectively
 excluded_video_feature_nums = [23, 24, 25, 26, 27, 28, 29, 60, 61]
@@ -54,7 +52,88 @@ def fill_missing_value_simple(df):
     return df.interpolate(method="cubic", limit_direction="both")
 
 
-def fill_missing_value(matrix):
+def fill_missing_values_df(df, threshold=0.3, fallback_method='ffill'):
+    """
+    Fill missing values in a DataFrame using interpolation.
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        Input DataFrame containing missing values
+    threshold : float, default=0.3
+        Maximum allowed proportion of missing values (30% by default)
+    fallback_method : str, default='ffill'
+        Method to use for filling any remaining missing values after interpolation
+        Options: 'ffill', 'bfill', 'mean', 'median'
+        
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with all missing values filled
+        
+    Raises:
+    -------
+    ValueError
+        If the proportion of missing values exceeds the threshold
+    """
+    # Check if input is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    # Create a copy to avoid modifying the original DataFrame
+    df_copy = df.copy()
+    
+    # Calculate proportion of missing values
+    missing_prop = df_copy.isna().sum().sum() / (df_copy.shape[0] * df_copy.shape[1])
+    
+    if missing_prop > threshold:
+        raise ValueError(f"Missing value proportion ({missing_prop:.2%}) exceeds threshold ({threshold:.2%})")
+    
+    # Convert DataFrame to numpy array for interpolation
+    matrix = df_copy.values.astype(float)
+    
+    # Create coordinate grid
+    x = np.arange(0, matrix.shape[1])
+    y = np.arange(0, matrix.shape[0])
+    xx, yy = np.meshgrid(x, y)
+    
+    # Mask invalid values
+    masked_matrix = np.ma.masked_invalid(matrix)
+    
+    # Get valid coordinates and values
+    x1 = xx[~masked_matrix.mask]
+    y1 = yy[~masked_matrix.mask]
+    valid_values = matrix[~masked_matrix.mask]
+    
+    # Perform cubic interpolation
+    filled_matrix = interpolate.griddata(
+        (x1, y1), valid_values.ravel(), (xx, yy), method='cubic'
+    )
+    
+    # Convert back to DataFrame
+    result_df = pd.DataFrame(filled_matrix, index=df_copy.index, columns=df_copy.columns)
+    
+    # Check for remaining NaN values (can occur at edges or with sparse data)
+    if result_df.isna().any().any():
+        if fallback_method == 'ffill':
+            result_df = result_df.fillna(method='ffill').fillna(method='bfill')
+        elif fallback_method == 'bfill':
+            result_df = result_df.fillna(method='bfill').fillna(method='ffill')
+        elif fallback_method == 'mean':
+            result_df = result_df.fillna(result_df.mean())
+        elif fallback_method == 'median':
+            result_df = result_df.fillna(result_df.median())
+        else:
+            raise ValueError("Invalid fallback_method. Choose from: 'ffill', 'bfill', 'mean', 'median'")
+    
+    # Final check for any remaining NaN values
+    if result_df.isna().any().any():
+        raise RuntimeError("Failed to fill all missing values. Please try a different fallback_method.")
+        
+    return result_df
+
+
+def fill_missing_values(matrix):
     """
     This function will fill the missing nan values in a matrix.
     It will be used when we find less than 30% missing value
@@ -260,12 +339,12 @@ class CombiningAV:
                             video_features, 3
                         )
 
-                        nan_removed_video = fill_missing_value_simple(
+                        nan_removed_video = fill_missing_values_df(
                             downsampled_video
                         )
                         # print(nan_removed_video)
 
-                        assert check_null_values(nan_removed_video, speaker_file_name)
+                        check_null_values(nan_removed_video, speaker_file_name)
 
                         try:
                             audio_data_matrix = np.concatenate(
@@ -334,6 +413,7 @@ class CombiningAV:
                 )
 
 
-#### Main function code testing ####
-Data = CombiningAV("Processed/Features_50_25/", "Processed/IEMOCAP_full_release/", "Files/sameframe_50_25")
-Data.produce_speakerwise_AV_data()
+if __name__ == "__main__":
+    #### Main function code testing ####
+    Data = CombiningAV("Processed/Features_50_25/", "Processed/IEMOCAP_full_release/", "Files/sameframe_50_25")
+    Data.produce_speakerwise_AV_data()

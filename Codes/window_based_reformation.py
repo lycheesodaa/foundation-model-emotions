@@ -200,8 +200,9 @@ class WindowBasedReformation:
                 print(f"Exported to: {output_dir}{filename}")
 
 
-# Main function for test only
-
-task = WindowBasedReformation("Files/sameframe_50_25")
-# task.process_data("static")
-task.process_data("dynamic")
+if __name__ == "__main__":
+    # Main function for test only
+    
+    task = WindowBasedReformation("Files/sameframe_50_25")
+    # task.process_data("static")
+    task.process_data("dynamic")
