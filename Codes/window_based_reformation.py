@@ -1,9 +1,91 @@
 import pandas as pd
 import os
+from typing import Dict, List, Optional, Tuple, Union, Any
 import numpy as np
+from numpy.typing import NDArray
 
 
-class window_based_reformation:
+def make_window_idx(frame_length, frame_idx, overlap, window_type):
+    """
+    This function will create the index list for making overlapped windows,
+    through which, we will produce statistical features.
+
+    For example, make_window_idx(80, 30, 15, window_type='dynamic') returns:
+    [[0, 29], [15, 44], [30, 59], [45, 74], [60, 79]]
+
+    If window_type='static', it will return:
+    [[0, 79]]
+    """
+    index_list = []
+
+    if window_type == "dynamic":
+        i = 0
+        j = 0
+        while j < frame_length:
+            if (i + frame_idx - 1) < frame_length:
+                index_list.append([i, i + frame_idx])
+                j = i + frame_idx - 1
+            else:
+                index_list.append([i, frame_length])
+                break
+            i += overlap
+    elif window_type == "static":
+        index_list = [[0, frame_length]]
+
+    return index_list
+
+
+def _validate_features(features: Optional[NDArray]) -> bool:
+    """
+    Validate features array for null values and proper structure.
+    """
+    if features is None:
+        return False
+
+    # Check for NaN or infinite values
+    if not np.all(np.isfinite(features)):
+        return False
+
+    # Check for empty arrays
+    if features.size == 0:
+        return False
+
+    return True
+
+
+def check_null_values(df: pd.DataFrame, speaker_id: str) -> None:
+    """
+    Check for null values in the DataFrame and print detailed information about any nulls found.
+    Raises AssertionError with detailed information if nulls are found.
+    """
+    # Check each column for null values
+    null_columns = df.columns[df.isnull().any()].tolist()
+
+    if null_columns:
+        error_message = f"\nNull values found in {speaker_id} data:\n"
+
+        for col in null_columns:
+            # Get indices of null values in this column
+            null_indices = df[df[col].isnull()].index.tolist()
+            null_rows = df.iloc[null_indices]
+
+            error_message += f"\nColumn '{col}' has {len(null_indices)} null values:"
+            error_message += f"\nNull indices: {null_indices}"
+            error_message += "\nAffected rows:"
+            error_message += f"\n{null_rows}\n"
+
+            # If the column contains nested data (like features), provide more detail
+            if col == 'features':
+                error_message += "\nFeature shapes for null rows:"
+                for idx in null_indices:
+                    feat = df.loc[idx, 'features']
+                    shape = feat.shape if isinstance(feat, np.ndarray) else 'Not an array'
+                    error_message += f"\nIndex {idx}: {shape}"
+
+        raise AssertionError(error_message)
+
+
+class WindowBasedReformation:
     """
     This code converts the frame level data into a window-based reformed data.
     It also produces the statistical features for those windows
@@ -12,34 +94,6 @@ class window_based_reformation:
     def __init__(self, file_location):
         self.file_location = file_location
         print("Creating window based features...")
-
-    def make_window_idx(self, framelength, frame_idx, overlap, window_type):
-        """
-        This function will create the index list for making overlapped windows,
-        through which, we will produce statistical features.
-        
-        For example, make_window_idx(80, 30, 15, window_type='dynamic') returns:
-        [[0, 29], [15, 44], [30, 59], [45, 74], [60, 79]]
-        
-        If window_type='static', it will return:
-        [[0, 79]]
-        """
-        index_list = []
-        if window_type == "dynamic":
-            i = 0
-            j = 0
-            while j < framelength:
-                if (i + frame_idx - 1) < framelength:
-                    index_list.append([i, i + frame_idx])
-                    j = i + frame_idx - 1
-                else:
-                    index_list.append([i, framelength])
-                    break
-                i += overlap
-        elif window_type == "static":
-
-            index_list = [[0, framelength]]
-        return index_list
 
     def process_data(self, window_type):
         """
@@ -63,7 +117,7 @@ class window_based_reformation:
                 # exit()
 
                 for utterance in range(len(audio_visual_framewise)):
-                    index_list = self.make_window_idx(
+                    index_list = make_window_idx(
                         audio_visual_framewise["audio"][utterance].shape[0],
                         30,
                         15,
@@ -118,6 +172,11 @@ class window_based_reformation:
                             ),
                             axis=1,
                         )
+
+                        assert _validate_features(statistical_feat),\
+                            (f'statistical feature vector for {speaker}{gender} - utt{utterance}, window{idx} has nulls\n'
+                             f'{statistical_feat}')
+
                         window_wise_feature[idx, :] = statistical_feat
                         print(
                             f"speaker is {speaker}{gender} and data is {utterance}, len of the idx is {len(index_list)}"
@@ -143,6 +202,6 @@ class window_based_reformation:
 
 # Main function for test only
 
-task = window_based_reformation("Files/sameframe_50_25")
+task = WindowBasedReformation("Files/sameframe_50_25")
 # task.process_data("static")
 task.process_data("dynamic")

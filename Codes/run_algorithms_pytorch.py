@@ -1,4 +1,5 @@
-import os
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 import torch
@@ -6,18 +7,46 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
 from sklearn.metrics import recall_score, confusion_matrix
 from sklearn.model_selection import LeaveOneGroupOut
+from tqdm import tqdm
+
 
 class TimeseriesDataset(Dataset):
-    """Custom Dataset for loading the audio-visual features"""
+    """Custom Dataset for loading the audiovisual features"""
     def __init__(self, features, labels):
         self.features = torch.FloatTensor(features)
-        self.labels = torch.LongTensor(labels)
+        print(self.features.shape)
+
+        # Create label encoder
+        unique_labels = sorted(set(labels))
+        self.label_to_idx = {label: idx for idx, label in enumerate(unique_labels)}
+        self.idx_to_label = {idx: label for label, idx in self.label_to_idx.items()}
+
+        # Print the label mapping
+        print("\nLabel Encoding Mapping:")
+        print("-" * 20)
+        for label, idx in self.label_to_idx.items():
+            print(f"'{label}' -> {idx}")
+        print("-" * 20)
+
+        # Convert string labels to indices
+        encoded_labels = [self.label_to_idx[label] for label in labels]
+        self.labels = torch.LongTensor(encoded_labels)
+
+        # Store number of classes
+        self.num_classes = len(unique_labels)
+        print(f"Total number of classes: {self.num_classes}\n")
 
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, idx):
         return self.features[idx], self.labels[idx]
+
+    def decode_labels(self, encoded_labels):
+        """Convert numeric labels back to original string labels"""
+        if isinstance(encoded_labels, torch.Tensor):
+            encoded_labels = encoded_labels.cpu().numpy()
+        return [self.idx_to_label[idx] for idx in encoded_labels]
 
 class LSTMModel(nn.Module):
     def __init__(self, input_dim, hidden_dim=128, num_classes=4, bidirectional=False):
@@ -72,46 +101,57 @@ class FCDNNModel(nn.Module):
         x = self.fc4(x)
         return x
 
+
+def prepare_data(directory, feature_type="dynamic"):
+    print(f'Preparing data from {directory}...')
+
+    features = {}
+    labels = []
+    speakers = []
+    for speaker in range(1, 6):
+        for gender in ['F', 'M']:
+            speaker_id = f"{speaker}{gender}"
+
+            filepath = Path(directory) / feature_type / f"audio_visual_speaker_{speaker_id}.csv"
+            feature_set = pd.read_pickle(filepath)
+            features[speaker_id] = np.vstack([
+                feature_set["features"][idx] for idx in range(feature_set.shape[0])
+            ])
+            if np.isnan(features[speaker_id]).any():
+                print(f"Warning: Null values found in features for speaker {speaker_id}")
+                features = np.nan_to_num(features, nan=0.0)
+            labels.extend([
+                feature_set["UF_label"][idx] for idx in range(feature_set.shape[0])
+            ])
+            speakers.extend([speaker_id] * feature_set.shape[0])
+
+    full_feature_set = np.vstack(list(features.values()))
+
+    data_instances = len(labels)
+    sequence_length = int(full_feature_set.shape[0] / data_instances)
+    feature_dimension = 895
+
+    if feature_type == "dynamic":
+        full_feature_set = full_feature_set.reshape(
+            data_instances, sequence_length, feature_dimension
+        )
+
+    return full_feature_set, np.asarray(labels), np.asarray(speakers)
+
+
 class RunDeepLearning:
     """
-    This class will run the deep learning algorithms, LSTM and BLSTM
-    from the speakerwise processed data
+    This class will run the deep learning algorithms, LSTM/BiLSTM/FC-DNN
+    from the speaker-wise processed data
     """
     def __init__(self, device='cuda' if torch.cuda.is_available() else 'cpu'):
         self.device = device
-
-    def prepare_data(self, directory, feature_type="dynamic"):
-        Features = {}
-        Labels = []
-        Speakers = []
-        for speaker in range(1, 11):
-            filepath = os.path.join(directory, f"audio_visual_speaker_{speaker}.csv")
-            feature_set = pd.read_pickle(filepath)
-            Features[speaker] = np.vstack([
-                feature_set["features"][idx] for idx in range(feature_set.shape[0])
-            ])
-            Labels.extend([
-                feature_set["UF_label"][idx] for idx in range(feature_set.shape[0])
-            ])
-            Speakers.extend([speaker] * feature_set.shape[0])
-
-        Full_feature_set = np.vstack([Features[speaker] for speaker in range(1, 11)])
-
-        data_instances = len(Labels)
-        sequence_length = int(Full_feature_set.shape[0] / data_instances)
-        feature_dimension = 895
-        
-        if feature_type == "dynamic":
-            Full_feature_set = Full_feature_set.reshape(
-                data_instances, sequence_length, feature_dimension
-            )
-        
-        return Full_feature_set, np.asarray(Labels), np.asarray(Speakers)
+        self.max_grad_norm = 1.0  # For gradient clipping
 
     def train_epoch(self, model, train_loader, criterion, optimizer):
         model.train()
         running_loss = 0.0
-        for features, labels in train_loader:
+        for features, labels in tqdm(train_loader):
             features, labels = features.to(self.device), labels.to(self.device)
             
             optimizer.zero_grad()
@@ -128,14 +168,14 @@ class RunDeepLearning:
         running_loss = 0.0
         correct = 0
         total = 0
-        
+
         with torch.no_grad():
             for features, labels in val_loader:
                 features, labels = features.to(self.device), labels.to(self.device)
                 outputs = model(features)
                 loss = criterion(outputs, labels)
                 running_loss += loss.item()
-                
+
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
@@ -152,7 +192,8 @@ class RunDeepLearning:
         for epoch in range(num_epochs):
             train_loss = self.train_epoch(model, train_loader, criterion, optimizer)
             val_loss, val_acc = self.validate(model, val_loader, criterion)
-            
+            print(f'Epoch {epoch} - Validation Loss: {val_loss} | Validation Accuracy: {val_acc}')
+
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 patience_counter = 0
@@ -160,6 +201,8 @@ class RunDeepLearning:
                 patience_counter += 1
                 
             if patience_counter >= patience:
+                print(f'Validation has not improved in {patience} runs. Early stopping...')
+                print(f'Best validation loss: {val_loss}')
                 break
                 
         return model
@@ -173,38 +216,44 @@ class RunDeepLearning:
         unweighted_recall = {}
         
         input_dim = features.shape[2] if model_type == "lstm" else features.shape[1]
-        
+
+        # leave-one-out cross validation
         speaker = 0
         for train_idx, test_idx in logo.split(features, labels, speaker_id):
+            # Create the dataset
+            dataset = TimeseriesDataset(features, labels)
+
             if model_type == "lstm":
                 model = LSTMModel(
                     input_dim=input_dim,
+                    num_classes=dataset.num_classes,
                     bidirectional=bidirectional
                 ).to(self.device)
             else:
-                model = FCDNNModel(input_dim=input_dim).to(self.device)
+                model = FCDNNModel(
+                    input_dim=input_dim,
+                    num_classes=dataset.num_classes
+                ).to(self.device)
 
-            # Create dataset and dataloaders
-            dataset = TimeseriesDataset(features, labels)
-            train_sampler = SubsetRandomSampler(train_idx)
+            # Create train/val split from training data
+            train_size = int(0.8 * len(train_idx))
+            train_subset = train_idx[:train_size]
+            val_subset = train_idx[train_size:]
+
+            # Create samplers for each set
+            train_sampler = SubsetRandomSampler(train_subset)
+            val_sampler = SubsetRandomSampler(val_subset)
             test_sampler = SubsetRandomSampler(test_idx)
-            
+
+            # Create data loaders
             train_loader = DataLoader(
                 dataset, batch_size=128, sampler=train_sampler
             )
+            val_loader = DataLoader(
+                dataset, batch_size=128, sampler=val_sampler
+            )
             test_loader = DataLoader(
                 dataset, batch_size=128, sampler=test_sampler
-            )
-            
-            # Split train into train and validation
-            train_size = int(0.8 * len(train_idx))
-            val_size = len(train_idx) - train_size
-            train_subset, val_subset = torch.utils.data.random_split(
-                train_idx, [train_size, val_size]
-            )
-            
-            val_loader = DataLoader(
-                dataset, batch_size=128, sampler=SubsetRandomSampler(val_subset)
             )
             
             # Train the model
@@ -225,7 +274,8 @@ class RunDeepLearning:
             
             test_predictions = np.array(test_predictions)
             test_labels = np.array(test_labels)
-            
+
+            # evaluation metrics
             predict_probability[speaker] = test_predictions
             test_GT[speaker] = test_labels
             model_pred[speaker] = np.argmax(test_predictions, axis=1)
@@ -240,3 +290,8 @@ class RunDeepLearning:
             speaker += 1
             
         return test_GT, model_pred, predict_probability, confusion_matrices, unweighted_recall
+
+
+features, label, speaker_group = prepare_data(directory='Files/UF_His_data/step_1')
+forecast = RunDeepLearning()
+forecast.run_model(features, label, speaker_group)

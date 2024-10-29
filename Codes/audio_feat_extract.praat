@@ -1,9 +1,9 @@
 #Praat skeleton code for audio feature extraction
 
-#[female]
+# [female]
 
+# Modify these directories as required
 directory$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Female/"
-
 outdir$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Features_50_25/"
 
 extension$ = ".wav"
@@ -170,17 +170,11 @@ endfor
 
 # [male]
 
-# This script measures intensity every 10ms
-
- 
-
+# Modify these directories as required
 directory$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Male/"
-
 outdir$ = "C:/Users/caedm/Documents/Emotion-Forecasting/Processed/Features_50_25/"
 
 extension$ = ".wav"
-
- 
 
  
 # Create a strings list to store folder names

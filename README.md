@@ -1,3 +1,13 @@
+**This repository contains code heavily adapted from [Sadat Shahriar's Emotion Forecasting Project](https://github.com/sadat1971/Emotion-Forecasting).**
+
+The code was optimized and adapted to fit more recent versions of pandas, and extended to process data into the format required for processing by the Moirai time-series foundation model. 
+
+The process flow is as follows:
+- Download the IEMOCAP dataset from [USC SAIL's website](https://sail.usc.edu/iemocap/iemocap_release.htm) and extract it into the `Processed/` folder. 
+  - Separate the audio `.wav` files into the `Processed/Female` and `Processed/Male` folders accordingly (e.g. `Ses01F_impro01_*.wav` files for females, and `Ses01M_impro01_*.wav` files for males).
+- Run the `audio_feat_extract.praat` file with [Praat](https://www.fon.hum.uva.nl/praat/).
+- Run the `combine_audiovisual_data.py`, `window_based_reformation.py`, `utterance_prep.py` and `run_algorithms_pytorch.py` files, in that order.
+---
 # Emotion-Forecasting
 **This respository contains code and step-by-step guide for completing the Emotion Forecasting Project.**
 ## Background:

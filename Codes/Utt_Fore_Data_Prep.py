@@ -268,9 +268,7 @@ class Prepare_UF_history_Data(Prepare_UF_Cur_Data):
                         else:
                             data_instance = {
                                 "cuurent_name": current_utt_name,
-                                "features": audio_visual_data["stat_features"][
-                                    data_idx
-                                ],
+                                "features": audio_visual_data["stat_features"][data_idx],
                                 "UF_label": audio_visual_data["label"][data_idx + step],
                                 "forecasted_utt_name": target_utt_name,
                                 "time_distance": self.find_time_distance(

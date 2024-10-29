@@ -6,6 +6,7 @@ import pickle
 import re
 import os
 from pathlib import Path
+from window_based_reformation import _validate_features, check_null_values
 
 # numbers represent LLID, RLID, MH, MNOSE, LNSTRL, TNOSE, RNSTRL, LHD and RHD respectively
 excluded_video_feature_nums = [23, 24, 25, 26, 27, 28, 29, 60, 61]
@@ -14,9 +15,69 @@ for num in excluded_video_feature_nums:
     excluded_video_features.extend([f"X{num}", f"Y{num}", f"Z{num}"])
 
 
-class combining_AV:
+def interpolate_column(column, target_length):
+    # Create original indices
+    original_indices = np.arange(len(column))
+
+    # Create target indices for interpolation
+    target_indices = np.linspace(0, len(column) - 1, target_length)
+
+    # Create interpolation function
+    f = interpolate.interp1d(
+        original_indices, column, kind="linear", fill_value="extrapolate"
+    )
+
+    # Generate interpolated values
+    interpolated = f(target_indices)
+
+    return interpolated
+
+
+def downsample_data_simple(df, value):
     """
-    This class works for cobining the audio and visual data of IEMOCAP dataset
+    Downsample DataFrame by keeping every nth row (where n = value)
+    """
+    return df.iloc[::value]
+
+
+def downsample_data(data, value):
+    del_row = [i for i in range(len(data)) if i % value != 0]
+    new_data = np.delete(data, del_row, axis=0)
+    return new_data
+
+
+def fill_missing_value_simple(df):
+    """
+    Simpler version using pandas built-in interpolation methods.
+    This will do interpolation along each column independently.
+    """
+    return df.interpolate(method="cubic", limit_direction="both")
+
+
+def fill_missing_value(matrix):
+    """
+    This function will fill the missing nan values in a matrix.
+    It will be used when we find less than 30% missing value
+    """
+    x = np.arange(0, matrix.shape[1])
+    y = np.arange(0, matrix.shape[0])
+    # mask invalid values
+    matrix = np.ma.masked_invalid(matrix)
+    xx, yy = np.meshgrid(x, y)
+    # get only the valid values
+    x1 = xx[~matrix.mask]
+    y1 = yy[~matrix.mask]
+    newarr = matrix[~matrix.mask]
+
+    filled_matrix = interpolate.griddata(
+        (x1, y1), newarr.ravel(), (xx, yy), method="cubic"
+    )
+    return filled_matrix
+
+
+class CombiningAV:
+    """
+    This class works for combining the audio and visual data of IEMOCAP dataset
     """
 
     def __init__(self, audio_feature_location, video_feature_location, output_dir):
@@ -121,61 +182,6 @@ class combining_AV:
         # MFCC values have 13 columns, as the first feature contains the C0 value, related to the energy, and is not contained in the number_of_coefficients=12 argument
         return P, E, MFB_value[4:], [row[1:] for row in MFCC_value[4:]]
 
-    def downsample_data_simple(self, df, value):
-        """
-        Downsample DataFrame by keeping every nth row (where n = value)
-        """
-        return df.iloc[::value]
-
-    def downsample_data(self, data, value):
-        del_row = [i for i in range(len(data)) if i % value != 0]
-        new_data = np.delete(data, del_row, axis=0)
-        return new_data
-
-    def fill_missing_value_simple(self, df):
-        """
-        Simpler version using pandas built-in interpolation methods.
-        This will do interpolation along each column independently.
-        """
-        return df.interpolate(method="cubic", limit_direction="both")
-
-    def fill_missing_value(self, matrix):
-        """
-        This function will fill the missing nan values in a matrix.
-        It will be used when we find less than 30% missing value
-        """
-        x = np.arange(0, matrix.shape[1])
-        y = np.arange(0, matrix.shape[0])
-        # mask invalid values
-        matrix = np.ma.masked_invalid(matrix)
-        xx, yy = np.meshgrid(x, y)
-        # get only the valid values
-        x1 = xx[~matrix.mask]
-        y1 = yy[~matrix.mask]
-        newarr = matrix[~matrix.mask]
-
-        filled_matrix = interpolate.griddata(
-            (x1, y1), newarr.ravel(), (xx, yy), method="cubic"
-        )
-        return filled_matrix
-
-    def interpolate_column(self, column, target_length):
-        # Create original indices
-        original_indices = np.arange(len(column))
-
-        # Create target indices for interpolation
-        target_indices = np.linspace(0, len(column) - 1, target_length)
-
-        # Create interpolation function
-        f = interpolate.interp1d(
-            original_indices, column, kind="linear", fill_value="extrapolate"
-        )
-
-        # Generate interpolated values
-        interpolated = f(target_indices)
-
-        return interpolated
-
     def produce_speakerwise_AV_data(self):
         """
         This code will produce speaker-wise audio-visual data with a same framerate.
@@ -250,15 +256,16 @@ class combining_AV:
                         )
                         Length = finish - start
 
-                        # No longer downsampling since we directly extract and use an equivalent time_step for both audio and video
-                        downsampled_video = self.downsample_data_simple(
+                        downsampled_video = downsample_data_simple(
                             video_features, 3
                         )
 
-                        nan_removed_video = self.fill_missing_value_simple(
+                        nan_removed_video = fill_missing_value_simple(
                             downsampled_video
                         )
                         # print(nan_removed_video)
+
+                        assert check_null_values(nan_removed_video, speaker_file_name)
 
                         try:
                             audio_data_matrix = np.concatenate(
@@ -276,7 +283,7 @@ class combining_AV:
                                 if len(row) != target_length:
                                     print(i)
                                     print(row)
-                                    MFB[i] = self.interpolate_column(
+                                    MFB[i] = interpolate_column(
                                         MFB[i], target_length
                                     )
 
@@ -285,7 +292,7 @@ class combining_AV:
                                 if len(row) != target_length:
                                     print(i)
                                     print(row)
-                                    MFCC[i] = self.interpolate_column(
+                                    MFCC[i] = interpolate_column(
                                         MFCC[i], target_length
                                     )
 
@@ -328,5 +335,5 @@ class combining_AV:
 
 
 #### Main function code testing ####
-Data = combining_AV("Processed/Features_50_25/", "Processed/IEMOCAP_full_release/", "Files/sameframe_50_25")
+Data = CombiningAV("Processed/Features_50_25/", "Processed/IEMOCAP_full_release/", "Files/sameframe_50_25")
 Data.produce_speakerwise_AV_data()

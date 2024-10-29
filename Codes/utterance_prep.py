@@ -2,10 +2,13 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import re
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, Any
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from pandas import DataFrame
+from window_based_reformation import _validate_features, check_null_values
+
 
 @dataclass
 class UtteranceInfo:
@@ -26,15 +29,15 @@ class UtteranceDataProcessor:
         self.base_path = Path(base_path)
         print("Initializing utterance data processor...")
 
-    def parse_iemocap_info(self, info_file: str = "IEMOCAP_EmoEvaluation.txt") -> pd.DataFrame:
+    def parse_iemocap_info_from_raw(self, info_file: str = "IEMOCAP_EmoEvaluation.txt") -> pd.DataFrame:
         """Parse IEMOCAP timing information into a structured format."""
         utterance_data: List[UtteranceInfo] = []
-        
+
         for session in range(1,6):
             file_path = Path(f'Processed/IEMOCAP_full_release/Session{session}/dialog/EmoEvaluation')
-            
+
             text_files = [file for file in os.listdir(file_path) if file.endswith('.txt')]
-        
+
             for text_file in text_files:
                 # Read all lines at once
                 with open(file_path / text_file) as f:
@@ -51,16 +54,19 @@ class UtteranceDataProcessor:
                             start_time=start_time,
                             end_time=end_time
                         ))
-        
+
         return pd.DataFrame.from_records([vars(u) for u in utterance_data])
 
-    def calculate_time_distance(self, lookup_table: pd.DataFrame, 
+    def parse_iemocap_info(self, info_file: str = "iemocap_full_dataset_w_dims.csv"):
+        return pd.read_csv(Path(self.base_path) / info_file)[['name', 'start_time', 'end_time']]
+
+    def calculate_time_distance(self, lookup_table: pd.DataFrame,
                               current_utt: str, future_utt: str) -> float:
         """Calculate time distance between utterances using vectorized operations."""
         def get_utterance_midpoint(utt_name: str) -> float:
             utt_data = lookup_table[lookup_table['name'].str.contains(utt_name)].iloc[0]
             return (utt_data['start_time'] + utt_data['end_time']) / 2
-            
+
         return get_utterance_midpoint(future_utt) - get_utterance_midpoint(current_utt)
 
     def normalize_features(self, features: List[NDArray]) -> List[NDArray]:
@@ -70,7 +76,7 @@ class UtteranceDataProcessor:
         std_feat = np.std(stacked_features, axis=0, keepdims=True)
         return [(feat - mean_feat) / std_feat for feat in features]
 
-    def save_processed_data(self, 
+    def save_processed_data(self,
                           data: Dict[str, pd.DataFrame],
                           utt_lengths: List[int],
                           step: int,
@@ -100,7 +106,7 @@ class UFCurrentDataProcessor(UtteranceDataProcessor):
     
     def process_dataset(self, step: int = 0, 
                        feature_type: str = "dynamic",
-                       normalize: bool = False) -> Dict[str, pd.DataFrame]:
+                       normalize: bool = False) -> tuple[dict[str, DataFrame], list[Any]]:
         """Process the current utterance dataset with optimized operations."""
         print('Processing Current Data...')
         speaker_data = {}
@@ -148,15 +154,16 @@ class UFCurrentDataProcessor(UtteranceDataProcessor):
         
         return speaker_data, utt_lengths
 
+
 class UFHistoryDataProcessor(UtteranceDataProcessor):
     """Process historical utterance forecasting data."""
     
     def __init__(self):
         super().__init__(data_dir="UF_His_data")
-        
-    def process_dataset(self, step: int = 0, 
+
+    def process_dataset(self, step: int = 0,
                        feature_type: str = "dynamic",
-                       normalize: bool = False) -> Dict[str, pd.DataFrame]:
+                       normalize: bool = False) -> tuple[dict[str, DataFrame], list[Any]]:
         """Process the historical dataset with optimized operations."""
         print('Processing Historical Data...')
         speaker_data = {}
@@ -176,9 +183,15 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
                 for idx in range(len(audio_data) - step):
                     current_name = audio_data['name'].iloc[idx]
                     target_name = audio_data['name'].iloc[idx + step]
-                    
+
+                    # Skip if not in same dialog or invalid label
+                    if (pd.isna(audio_data['label'].iloc[idx + step])
+                        or current_name[:-5] != target_name[:-5]):
+                        continue
+
                     features = audio_data['stat_features'].iloc[idx]
-                    
+
+                    # Include history if idx > 0 and same speaker in history
                     if idx > 0:
                         history_name = audio_data['name'].iloc[idx - 1]
                         if current_name[:-5] == history_name[:-5]:
@@ -186,23 +199,26 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
                                 audio_data['stat_features'].iloc[idx - 1],
                                 features
                             ))
-                    
-                    if (current_name[:-5] == target_name[:-5] and 
-                        audio_data['label'].iloc[idx + step] is not None):
-                        
-                        utt_lengths.append(features.shape[0])
-                        
-                        uf_data.append({
-                            'current_name': current_name,
-                            'features': features,
-                            'UF_label': audio_data['label'].iloc[idx + step],
-                            'forecasted_utt_name': target_name,
-                            'time_distance': self.calculate_time_distance(
-                                lookup_table, current_name, target_name
-                            )
-                        })
+
+                    assert _validate_features(features), f'feature vectors have nulls'
+
+                    utt_lengths.append(features.shape[0])
+                    uf_data.append({
+                        'current_name': current_name,
+                        'features': features,
+                        'UF_label': audio_data['label'].iloc[idx + step],
+                        'forecasted_utt_name': target_name,
+                        'time_distance': self.calculate_time_distance(
+                            lookup_table, current_name, target_name
+                        )
+                    })
                 
                 uf_df = pd.DataFrame(uf_data)
+
+                # Check for null values with detailed reporting
+                check_null_values(uf_df, speaker_id)
+
+                # assert uf_df.notnull().all().all(), f"Null values found in {speaker_id} data"
                 
                 if normalize:
                     uf_df['features'] = self.normalize_features(uf_df['features'].tolist())
