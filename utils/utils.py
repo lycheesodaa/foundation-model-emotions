@@ -1,12 +1,12 @@
 import os.path
 from pathlib import Path
+from typing import Optional
 
-import pandas as pd
-import numpy as np
-from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
-from typing import Dict, List, Optional, Tuple, Union, Any
+import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
+from sklearn.metrics import confusion_matrix
 
 
 def _validate_features(features: Optional[NDArray]) -> bool:
@@ -60,7 +60,7 @@ def check_null_values(df: pd.DataFrame, speaker_id: str) -> None:
 
 
 def confusion_matrix_plot(speaker, y_true, y_pred, classes,
-                          savedir='images',
+                          savedir='Images',
                           normalize=False,
                           title=None,
                           cmap=plt.colormaps.get_cmap('Blues')):

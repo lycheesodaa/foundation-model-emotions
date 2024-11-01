@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 import numpy as np
-from utils import _validate_features, check_null_values
+from utils.utils import _validate_features, check_null_values
 
 def make_window_idx(frame_length, frame_idx, overlap, window_type):
     """
@@ -75,7 +75,6 @@ class WindowBasedReformation:
                     windows.append(len(index_list))
 
                     # temporary step to ensure that the video data doesn't contain nulls
-                    # TODO remove once data is processed properly in combine_audiovisual_data.py
                     if audio_visual_framewise["video"][utterance].isnull().any().any():
                         audio_visual_framewise["video"][utterance] = audio_visual_framewise["video"][utterance].ffill().bfill()
 
@@ -89,15 +88,6 @@ class WindowBasedReformation:
                         ),
                         axis=1,
                     )
-
-                    # print(audio_visual_framewise['audio'][utterance])
-                    # print(len(audio_visual_framewise['audio'][utterance]), len(audio_visual_framewise['audio'][utterance][1]))
-                    # print()
-                    # print(audio_visual_framewise['video'][utterance])
-                    # print(len(audio_visual_framewise['video'][utterance]))
-                    # print()
-                    # print(features_concatenated.shape)
-                    # exit()
 
                     # Extract statistical information from window-based data
                     if mean_only:

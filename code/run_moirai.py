@@ -1,15 +1,15 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from sklearn.model_selection import LeaveOneGroupOut
-from sklearn.metrics import recall_score, confusion_matrix
+from sklearn.metrics import recall_score
 from tqdm import tqdm
 from uni2ts.model.moirai import MoiraiModule
 
-from utils import prepare_data, confusion_matrix_plot
-from emotion_predictor import EmotionForecastModel, EmotionPredictor
-from emotion_dataset import EmotionDataset
+from utils.utils import prepare_data, confusion_matrix_plot
+from models.emotion_predictor import EmotionForecastModel, EmotionPredictor
+from data_provider.emotion_dataset import EmotionDataset
 
 
 def train_emotion_forecast_model(
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         # print(confusion_matrix(result['true_labels'], predictions))
         confusion_matrix_plot(
             str(speaker), result['true_labels'], predictions,
-            ['Anger', 'Happy', 'Neutral', 'Sad'], savedir=f'images/pl{pred_len}', normalize=False
+            ['Anger', 'Happy', 'Neutral', 'Sad'], savedir=f'Images/pl{pred_len}', normalize=False
         )
 
         # Recall score
