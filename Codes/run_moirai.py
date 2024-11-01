@@ -72,8 +72,8 @@ def train_emotion_forecast_model(features, labels, speaker_ids, prediction_lengt
             train_loss = predictor.train_epoch(train_loader, optimizer, criterion)
 
             # Validate
-            val_loss, val_acc = predictor.validate(val_loader, criterion)
-            print(f"Epoch {epoch}: Train Loss = {train_loss:.4f}, Val Loss = {val_loss:.4f}, Val Acc = {val_acc:.4f}")
+            val_loss, val_uwr = predictor.validate(val_loader, criterion)
+            print(f"Epoch {epoch}: Train Loss = {train_loss:.4f}, Val Loss = {val_loss:.4f}, Val UWR = {val_uwr:.4f}")
 
             # Early stopping
             if val_loss < best_val_loss:

@@ -14,21 +14,23 @@ from utils import confusion_matrix_plot, prepare_data
 
 class TimeseriesDataset(Dataset):
     """Custom Dataset for loading the audiovisual features"""
-    def __init__(self, features, labels):
+    def __init__(self, features, labels, verbose=False):
         self.features = torch.FloatTensor(features)
-        print(self.features.shape)
 
         # Create label encoder
         unique_labels = sorted(set(labels))
         self.label_to_idx = {label: idx for idx, label in enumerate(unique_labels)}
         self.idx_to_label = {idx: label for label, idx in self.label_to_idx.items()}
 
-        # Print the label mapping
-        print("\nLabel Encoding Mapping:")
-        print("-" * 20)
-        for label, idx in self.label_to_idx.items():
-            print(f"'{label}' -> {idx}")
-        print("-" * 20)
+        if verbose:
+            print('Dataset shape:', self.features.shape)
+
+            # Print the label mapping
+            print("Label Encoding Mapping:")
+            print("-" * 20)
+            for label, idx in self.label_to_idx.items():
+                print(f"'{label}' -> {idx}")
+            print("-" * 20)
 
         # Convert string labels to indices
         encoded_labels = [self.label_to_idx[label] for label in labels]

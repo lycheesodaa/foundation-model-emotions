@@ -3,6 +3,7 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 from jaxtyping import Float, Bool
+from sklearn.metrics import recall_score
 from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
 
 
@@ -66,7 +67,9 @@ class EmotionForecastModel(nn.Module):
             observed_feat_dynamic_real=observed_feat_dynamic_real,
             past_feat_dynamic_real=past_feat_dynamic_real,
             past_observed_feat_dynamic_real=past_observed_feat_dynamic_real,
-            num_samples=1  # We only need one sample for classification
+
+            # TODO potentially change
+            num_samples=1
         )
 
         # Flatten the forecasts for classification
@@ -110,7 +113,7 @@ class EmotionPredictor:
             optimizer.zero_grad()
 
             # Forward pass
-            forecasts, emotion_logits = self.model(
+            _, emotion_logits = self.model(
                 past_target=past_target,
                 past_observed_target=past_observed_target,
                 past_is_pad=past_is_pad
@@ -135,8 +138,7 @@ class EmotionPredictor:
     ) -> Tuple[float, float]:
         self.model.eval()
         total_loss = 0.0
-        correct = 0
-        total = 0
+        total_UWR = 0.0
 
         with torch.no_grad():
             for batch in val_loader:
@@ -160,10 +162,9 @@ class EmotionPredictor:
 
                 # Calculate accuracy
                 _, predicted = torch.max(emotion_logits.data, 1)
-                total += emotion_labels.size(0)
-                correct += (predicted == emotion_labels).sum().item()
+                total_UWR += recall_score(emotion_labels, predicted, average='macro')
 
-        return total_loss / len(val_loader), correct / total
+        return total_loss / len(val_loader), total_UWR / len(val_loader)
 
     def predict(
             self,
