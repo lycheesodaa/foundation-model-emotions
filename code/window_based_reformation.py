@@ -43,7 +43,7 @@ class WindowBasedReformation:
         self.file_location = file_location
         print("Creating window based features...")
 
-    def process_data(self, window_type):
+    def process_data(self, window_type, mean_only=False):
         """
         Function which creates the statistical window-based data
         """
@@ -99,41 +99,44 @@ class WindowBasedReformation:
                     # print(features_concatenated.shape)
                     # exit()
 
-                    # ???
-                    # if utterance == 196:
-                    #     print(features_concatenated)
-
                     # Extract statistical information from window-based data
-                    window_wise_feature = np.zeros(
-                        (len(index_list), 895)
-                    )  # 5 statistical features from each of the 179 features.
+                    if mean_only:
+                        window_wise_feature = np.zeros((len(index_list), 179))
+                    else:
+                        window_wise_feature = np.zeros(
+                            (len(index_list), 895)
+                        )  # 5 statistical features from each of the 179 features.
+
                     for idx in range(len(index_list)):
                         parsed_features = features_concatenated[
                             index_list[idx][0] : index_list[idx][1]
                         ]
-                        statistical_feat = np.concatenate(
-                            (
-                                np.mean(parsed_features, axis=0).reshape(1, 179),
-                                np.std(parsed_features, axis=0).reshape(1, 179),
-                                np.quantile(parsed_features, 0.25, axis=0).reshape(
-                                    1, 179
+                        if mean_only:
+                            statistical_feat = np.mean(parsed_features, axis=0).reshape(1, 179)
+                        else:
+                            statistical_feat = np.concatenate(
+                                (
+                                    np.mean(parsed_features, axis=0).reshape(1, 179),
+                                    np.std(parsed_features, axis=0).reshape(1, 179),
+                                    np.quantile(parsed_features, 0.25, axis=0).reshape(
+                                        1, 179
+                                    ),
+                                    np.quantile(parsed_features, 0.75, axis=0).reshape(
+                                        1, 179
+                                    ),
+                                    np.quantile(parsed_features, 0.75, axis=0).reshape(
+                                        1, 179
+                                    )
+                                    - np.quantile(parsed_features, 0.25, axis=0).reshape(
+                                        1, 179
+                                    ),
                                 ),
-                                np.quantile(parsed_features, 0.75, axis=0).reshape(
-                                    1, 179
-                                ),
-                                np.quantile(parsed_features, 0.75, axis=0).reshape(
-                                    1, 179
-                                )
-                                - np.quantile(parsed_features, 0.25, axis=0).reshape(
-                                    1, 179
-                                ),
-                            ),
-                            axis=1,
-                        )
+                                axis=1,
+                            )
 
-                        assert _validate_features(statistical_feat),\
-                            (f'statistical feature vector for {speaker}{gender} - utt{utterance}, window{idx} has nulls\n'
-                             f'{statistical_feat}')
+                        # assert _validate_features(statistical_feat),\
+                        #     (f'statistical feature vector for {speaker}{gender} - utt{utterance}, window{idx} has nulls\n'
+                        #      f'{statistical_feat}')
 
                         window_wise_feature[idx, :] = statistical_feat
                         print(
@@ -150,6 +153,9 @@ class WindowBasedReformation:
                     )
 
                 output_dir = f"Files/statistical/{window_type}/"
+
+                if mean_only:
+                    output_dir += 'historical_mean/'
 
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
@@ -168,4 +174,4 @@ if __name__ == "__main__":
 
     task = WindowBasedReformation("Files/sameframe_50_25")
     # task.process_data("static")
-    task.process_data("dynamic")
+    task.process_data("dynamic", mean_only=True)

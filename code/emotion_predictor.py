@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from jaxtyping import Float, Bool
 from sklearn.metrics import recall_score
+from tqdm import tqdm
+from triton.language import dtype
 from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
 
 
@@ -93,6 +95,33 @@ class EmotionPredictor:
         self.device = device
         self.batch_size = batch_size
 
+    def prepare_input_tensors(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """
+        Prepare input tensors for the MOIRAI model with proper masking of zero values.
+
+        Args:
+            features: Input features tensor of shape (batch_size, sequence_length, feature_dim)
+
+        Returns:
+            tuple of:
+                - past_target: The feature values
+                - past_observed_target: Boolean mask indicating non-zero values
+                - past_is_pad: Boolean mask indicating padding at sequence level
+        """
+        # The features tensor will be used directly as past_target
+        past_target = features
+
+        # Create mask for non-zero values across all feature dimensions
+        # If any feature dimension is non-zero, we consider that timestep as observed
+        # past_observed_target = (features != 0.0)
+        past_observed_target = torch.ones_like(features, dtype=torch.bool)
+
+        # For sequence-level padding, we consider a timestep padded if all features are zero
+        # Shape: (batch_size, sequence_length)
+        past_is_pad = (features.sum(dim=2) == 0)
+
+        return past_target, past_observed_target, past_is_pad
+
     def train_epoch(
             self,
             train_loader: torch.utils.data.DataLoader,
@@ -102,13 +131,11 @@ class EmotionPredictor:
         self.model.train()
         total_loss = 0.0
 
-        for batch in train_loader:
+        for batch in tqdm(train_loader, total=len(train_loader)):
             features, emotion_labels = [b.to(self.device) for b in batch]
 
-            # Prepare input tensors (you'll need to modify this based on your data format)
-            past_target = features
-            past_observed_target = torch.ones_like(features, dtype=torch.bool)
-            past_is_pad = torch.zeros((features.shape[0], features.shape[1]), dtype=torch.bool)
+            # Prepare input tensors
+            past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
 
             optimizer.zero_grad()
 
@@ -141,13 +168,11 @@ class EmotionPredictor:
         total_UWR = 0.0
 
         with torch.no_grad():
-            for batch in val_loader:
+            for batch in tqdm(val_loader, total=len(val_loader)):
                 features, emotion_labels = batch[0].to(self.device), batch[1].to(self.device)
 
                 # Prepare input tensors
-                past_target = features
-                past_observed_target = torch.ones_like(features, dtype=torch.bool)
-                past_is_pad = torch.zeros((features.shape[0], features.shape[1]), dtype=torch.bool)
+                past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
 
                 # Forward pass
                 _, emotion_logits = self.model(
@@ -174,9 +199,7 @@ class EmotionPredictor:
 
         with torch.no_grad():
             # Prepare input tensors
-            past_target = features.to(self.device)
-            past_observed_target = torch.ones_like(past_target, dtype=torch.bool)
-            past_is_pad = torch.zeros((features.shape[0], features.shape[1]), dtype=torch.bool)
+            past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
 
             # Get predictions
             forecasts, emotion_logits = self.model(

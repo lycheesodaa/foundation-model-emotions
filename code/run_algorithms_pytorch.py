@@ -1,56 +1,12 @@
-from pathlib import Path
-
-import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
+from torch.utils.data import DataLoader, SubsetRandomSampler
 from sklearn.metrics import recall_score, confusion_matrix
 from sklearn.model_selection import LeaveOneGroupOut
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 from utils import confusion_matrix_plot, prepare_data
-
-
-class TimeseriesDataset(Dataset):
-    """Custom Dataset for loading the audiovisual features"""
-    def __init__(self, features, labels, verbose=False):
-        self.features = torch.FloatTensor(features)
-
-        # Create label encoder
-        unique_labels = sorted(set(labels))
-        self.label_to_idx = {label: idx for idx, label in enumerate(unique_labels)}
-        self.idx_to_label = {idx: label for label, idx in self.label_to_idx.items()}
-
-        if verbose:
-            print('Dataset shape:', self.features.shape)
-
-            # Print the label mapping
-            print("Label Encoding Mapping:")
-            print("-" * 20)
-            for label, idx in self.label_to_idx.items():
-                print(f"'{label}' -> {idx}")
-            print("-" * 20)
-
-        # Convert string labels to indices
-        encoded_labels = [self.label_to_idx[label] for label in labels]
-        self.labels = torch.LongTensor(encoded_labels)
-
-        # Store number of classes
-        self.num_classes = len(unique_labels)
-        print(f"Total number of classes: {self.num_classes}\n")
-
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, idx):
-        return self.features[idx], self.labels[idx]
-
-    def decode_labels(self, encoded_labels):
-        """Convert numeric labels back to original string labels"""
-        if isinstance(encoded_labels, torch.Tensor):
-            encoded_labels = encoded_labels.cpu().numpy()
-        return [self.idx_to_label[idx] for idx in encoded_labels]
+from emotion_dataset import EmotionDataset
 
 
 class MaskedLSTM(nn.Module):
@@ -231,7 +187,7 @@ class RunDeepLearning:
             print(f'\n******** Cross-validating speaker {speaker}... ********')
 
             # Create the dataset
-            dataset = TimeseriesDataset(features, labels)
+            dataset = EmotionDataset(features, labels)
 
             if model_type == "lstm":
                 model = LSTMModel(

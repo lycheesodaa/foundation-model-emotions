@@ -77,18 +77,23 @@ class UtteranceDataProcessor:
         return [(feat - mean_feat) / std_feat for feat in features]
 
     def save_processed_data(self,
-                          data: Dict[str, pd.DataFrame],
-                          utt_lengths: List[int],
-                          step: int,
-                          feature_type: str = "dynamic") -> None:
+                            data: Dict[str, pd.DataFrame],
+                            utt_lengths: List[int],
+                            step: int,
+                            feature_type: str = "dynamic",
+                            mean_only=False) -> None:
         """Save processed data efficiently."""
-        output_base = self.base_path / f"{self.data_dir}/step_{step}/{feature_type}"
+        if mean_only:
+            output_base = self.base_path / f"{self.data_dir}/step_{step}_mean/{feature_type}"
+        else:
+            output_base = self.base_path / f"{self.data_dir}/step_{step}/{feature_type}"
+
         output_base.mkdir(parents=True, exist_ok=True)
         
         max_length = max(utt_lengths)
         print(f'Total of {len(utt_lengths)} valid utterances.')
-        print(f'Padding to length {max_length}.')
-        
+        print(f'Padding to length {max_length} windows per utterance.')
+
         for speaker_id, df in data.items():
             print(f"Saving data for speaker {speaker_id}...")
             if feature_type == "dynamic":
@@ -107,8 +112,9 @@ class UFCurrentDataProcessor(UtteranceDataProcessor):
         super().__init__(data_dir="UF_Cur_data")
     
     def process_dataset(self, step: int = 0, 
-                       feature_type: str = "dynamic",
-                       normalize: bool = False) -> tuple[dict[str, DataFrame], list[Any]]:
+                        feature_type: str = "dynamic",
+                        normalize: bool = False,
+                        mean_only=False) -> tuple[dict[str, DataFrame], list[Any]]:
         """Process the current utterance dataset with optimized operations."""
         print('Processing Current Data...')
         speaker_data = {}
@@ -119,8 +125,10 @@ class UFCurrentDataProcessor(UtteranceDataProcessor):
             for gender in ['F', 'M']:
                 speaker_id = f"{speaker}{gender}"
                 
-                # Load data efficiently
-                data_path = self.base_path / "statistical" / feature_type / f"audio_visual_speaker_{speaker_id}.csv"
+                if mean_only:
+                    data_path = self.base_path / "statistical" / feature_type / 'historical_mean' / f"audio_visual_speaker_{speaker_id}.csv"
+                else:
+                    data_path = self.base_path / "statistical" / feature_type / f"audio_visual_speaker_{speaker_id}.csv"
                 audio_data = pd.read_pickle(data_path)
                 
                 # Pre-allocate DataFrame with estimated size
@@ -164,8 +172,9 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
         super().__init__(data_dir="UF_His_data")
 
     def process_dataset(self, step: int = 0,
-                       feature_type: str = "dynamic",
-                       normalize: bool = False) -> tuple[dict[str, DataFrame], list[Any]]:
+                        feature_type: str = "dynamic",
+                        normalize: bool = False,
+                        mean_only=False) -> tuple[dict[str, DataFrame], list[Any]]:
         """Process the historical dataset with optimized operations."""
         print('Processing Historical Data...')
         speaker_data = {}
@@ -177,7 +186,10 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
                 speaker_id = f"{speaker}{gender}"
                 print(f'Processing speaker {speaker_id}...')
                 
-                data_path = self.base_path / "statistical" / feature_type / f"audio_visual_speaker_{speaker_id}.csv"
+                if mean_only:
+                    data_path = self.base_path / "statistical" / feature_type / 'historical_mean' / f"audio_visual_speaker_{speaker_id}.csv"
+                else:
+                    data_path = self.base_path / "statistical" / feature_type / f"audio_visual_speaker_{speaker_id}.csv"
                 audio_data = pd.read_pickle(data_path)
 
                 uf_data = []
@@ -242,8 +254,8 @@ def main():
     
     # Process historical utterance data
     uf_his = UFHistoryDataProcessor()
-    his_data, his_lengths = uf_his.process_dataset(step=1, normalize=True)
-    uf_his.save_processed_data(his_data, his_lengths, step=1)
+    his_data, his_lengths = uf_his.process_dataset(step=1, normalize=True, mean_only=True)
+    uf_his.save_processed_data(his_data, his_lengths, step=1, mean_only=True)
 
 if __name__ == "__main__":
     main()

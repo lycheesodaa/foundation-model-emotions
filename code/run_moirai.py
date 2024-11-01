@@ -4,14 +4,19 @@ import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import LeaveOneGroupOut
 from sklearn.metrics import recall_score, confusion_matrix
+from tqdm import tqdm
 from uni2ts.model.moirai import MoiraiModule
 
 from utils import prepare_data, confusion_matrix_plot
 from emotion_predictor import EmotionForecastModel, EmotionPredictor
-from run_algorithms_pytorch import TimeseriesDataset
+from emotion_dataset import EmotionDataset
 
 
-def train_emotion_forecast_model(features, labels, speaker_ids, prediction_length=24, num_epochs=50, patience=10):
+def train_emotion_forecast_model(
+        features, labels, speaker_ids,
+        prediction_length=24, batch_size=16,
+        num_epochs=50, patience=10
+    ):
     # Model parameters
     target_dim = features.shape[2]  # Feature dimension
     context_length = features.shape[1]  # Sequence length
@@ -21,12 +26,13 @@ def train_emotion_forecast_model(features, labels, speaker_ids, prediction_lengt
     model = EmotionForecastModel(
         prediction_length=prediction_length,
         target_dim=target_dim,
-        feat_dynamic_real_dim=0,  # Adjust if you have dynamic features
-        past_feat_dynamic_real_dim=0,  # Adjust if you have past dynamic features
+        feat_dynamic_real_dim=0,  # adjust if you have dynamic features
+        past_feat_dynamic_real_dim=0,  # adjust if you have past dynamic features
         context_length=context_length,
         num_emotions=num_emotions,
         hidden_dim=256,
-        module=MoiraiModule.from_pretrained(f"Salesforce/moirai-1.0-R-large"),
+        module=MoiraiModule.from_pretrained(f"Salesforce/moirai-1.0-R-small"),
+        patch_size=8 # this argument is necessary to override 'auto' so MOIRAI processes only CTX, not CTX+PDT
     )
 
     # Setup cross-validation
@@ -45,23 +51,24 @@ def train_emotion_forecast_model(features, labels, speaker_ids, prediction_lengt
 
         # Create data loaders
         train_loader = DataLoader(
-            TimeseriesDataset(features[train_subset], labels[train_subset]),
-            batch_size=128,
+            EmotionDataset(features[train_subset], labels[train_subset], verbose=True),
+            batch_size=batch_size,
             shuffle=True
         )
         val_loader = DataLoader(
-            TimeseriesDataset(features[val_subset], labels[val_subset]),
-            batch_size=128
+            EmotionDataset(features[val_subset], labels[val_subset]),
+            batch_size=batch_size
         )
         test_loader = DataLoader(
-            TimeseriesDataset(features[test_idx], labels[test_idx]),
-            batch_size=128
+            EmotionDataset(features[test_idx], labels[test_idx]),
+            batch_size=batch_size
         )
 
         # Initialize training components
         predictor = EmotionPredictor(model, device=device)
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
 
         # Training loop
         best_val_loss = float('inf')
@@ -88,16 +95,17 @@ def train_emotion_forecast_model(features, labels, speaker_ids, prediction_lengt
                 print(f"Early stopping at epoch {epoch}")
                 break
 
+
+        # Test loop - get predictions
         # Load best model and evaluate on test set
         model.load_state_dict(torch.load(f'best_model_speaker_{speaker_ids[test_idx[0]]}.pt'))
         predictor = EmotionPredictor(model, device=device)
 
-        # Get predictions
         all_forecasts = []
         all_probs = []
         all_labels = []
 
-        for batch in test_loader:
+        for batch in tqdm(test_loader, total=len(test_loader)):
             features_batch, labels_batch = batch
             forecasts, probs = predictor.predict(features_batch)
             all_forecasts.append(forecasts)
@@ -117,12 +125,14 @@ def train_emotion_forecast_model(features, labels, speaker_ids, prediction_lengt
 # Example usage
 if __name__ == "__main__":
     pred_len = 24
+    batch_size = 1
 
-    # Prepare your data
-    features, labels, speaker_ids = prepare_data(directory='Files/UF_His_data/step_1')
+    # Prepare your data - Moirai uses the mean only data, so 179 features
+    features, labels, speaker_ids = prepare_data(directory='Files/UF_His_data/step_1_mean', mean_only=True)
 
     # Train model and get results
-    results = train_emotion_forecast_model(features, labels, speaker_ids, prediction_length=pred_len)
+    results = train_emotion_forecast_model(features, labels, speaker_ids,
+                                           prediction_length=pred_len, batch_size=batch_size)
 
     all_recall = []
     # Print results for each speaker

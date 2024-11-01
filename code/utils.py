@@ -110,7 +110,7 @@ def confusion_matrix_plot(speaker, y_true, y_pred, classes,
     return ax
 
 
-def prepare_data(directory, feature_type="dynamic", verbose=False):
+def prepare_data(directory, feature_type="dynamic", mean_only=False, verbose=False):
     print(f'Preparing data from {directory}...')
 
     features = {}
@@ -134,7 +134,7 @@ def prepare_data(directory, feature_type="dynamic", verbose=False):
 
     data_instances = len(labels)
     sequence_length = int(full_feature_set.shape[0] / data_instances)
-    feature_dimension = 895
+    feature_dimension = 179 if mean_only else 895
 
     if feature_type == "dynamic":
         full_feature_set = full_feature_set.reshape(
