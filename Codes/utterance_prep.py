@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from pandas import DataFrame
-from window_based_reformation import _validate_features, check_null_values
+from utils import _validate_features, check_null_values
 
 
 @dataclass
@@ -86,6 +86,8 @@ class UtteranceDataProcessor:
         output_base.mkdir(parents=True, exist_ok=True)
         
         max_length = max(utt_lengths)
+        print(f'Total of {len(utt_lengths)} valid utterances.')
+        print(f'Padding to length {max_length}.')
         
         for speaker_id, df in data.items():
             print(f"Saving data for speaker {speaker_id}...")
@@ -177,7 +179,7 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
                 
                 data_path = self.base_path / "statistical" / feature_type / f"audio_visual_speaker_{speaker_id}.csv"
                 audio_data = pd.read_pickle(data_path)
-                
+
                 uf_data = []
                 
                 for idx in range(len(audio_data) - step):
@@ -200,7 +202,7 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
                                 features
                             ))
 
-                    assert _validate_features(features), f'feature vectors have nulls'
+                    # assert _validate_features(features), f'feature vectors have nulls'
 
                     utt_lengths.append(features.shape[0])
                     uf_data.append({

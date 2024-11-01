@@ -1,9 +1,7 @@
 import pandas as pd
 import os
-from typing import Dict, List, Optional, Tuple, Union, Any
 import numpy as np
-from numpy.typing import NDArray
-
+from utils import _validate_features, check_null_values
 
 def make_window_idx(frame_length, frame_idx, overlap, window_type):
     """
@@ -35,56 +33,6 @@ def make_window_idx(frame_length, frame_idx, overlap, window_type):
     return index_list
 
 
-def _validate_features(features: Optional[NDArray]) -> bool:
-    """
-    Validate features array for null values and proper structure.
-    """
-    if features is None:
-        return False
-
-    # Check for NaN or infinite values
-    if not np.all(np.isfinite(features)):
-        return False
-
-    # Check for empty arrays
-    if features.size == 0:
-        return False
-
-    return True
-
-
-def check_null_values(df: pd.DataFrame, speaker_id: str) -> None:
-    """
-    Check for null values in the DataFrame and print detailed information about any nulls found.
-    Raises AssertionError with detailed information if nulls are found.
-    """
-    # Check each column for null values
-    null_columns = df.columns[df.isnull().any()].tolist()
-
-    if null_columns:
-        error_message = f"\nNull values found in {speaker_id} data:\n"
-
-        for col in null_columns:
-            # Get indices of null values in this column
-            null_indices = df[df[col].isnull()].index.tolist()
-            null_rows = df.iloc[null_indices]
-
-            error_message += f"\nColumn '{col}' has {len(null_indices)} null values:"
-            error_message += f"\nNull indices: {null_indices}"
-            error_message += "\nAffected rows:"
-            error_message += f"\n{null_rows}\n"
-
-            # If the column contains nested data (like features), provide more detail
-            if col == 'features':
-                error_message += "\nFeature shapes for null rows:"
-                for idx in null_indices:
-                    feat = df.loc[idx, 'features']
-                    shape = feat.shape if isinstance(feat, np.ndarray) else 'Not an array'
-                    error_message += f"\nIndex {idx}: {shape}"
-
-        raise AssertionError(error_message)
-
-
 class WindowBasedReformation:
     """
     This code converts the frame level data into a window-based reformed data.
@@ -99,6 +47,7 @@ class WindowBasedReformation:
         """
         Function which creates the statistical window-based data
         """
+        windows = []
 
         for speaker in range(1, 6):
             for gender in ["F", "M"]:
@@ -123,6 +72,15 @@ class WindowBasedReformation:
                         15,
                         window_type,
                     )
+                    windows.append(len(index_list))
+
+                    # temporary step to ensure that the video data doesn't contain nulls
+                    # TODO remove once data is processed properly in combine_audiovisual_data.py
+                    if audio_visual_framewise["video"][utterance].isnull().any().any():
+                        audio_visual_framewise["video"][utterance] = audio_visual_framewise["video"][utterance].ffill().bfill()
+
+                    assert audio_visual_framewise["video"][utterance].isnull().sum().sum() == 0
+
                     # the first two columns of 'video' are Frame# and Time, exclude them
                     features_concatenated = np.concatenate(
                         (
@@ -199,10 +157,15 @@ class WindowBasedReformation:
                 audio_visual_df.to_pickle(output_dir + filename)
                 print(f"Exported to: {output_dir}{filename}")
 
+        print('Average window length throughout all utterances:', np.mean(windows))
+        print('Max window length:', np.max(windows))
+        print('Min window length:', np.min(windows))
+        print('Number of windows:', len(windows))
+
 
 if __name__ == "__main__":
     # Main function for test only
-    
+
     task = WindowBasedReformation("Files/sameframe_50_25")
     # task.process_data("static")
     task.process_data("dynamic")

@@ -8,6 +8,8 @@ from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
 from sklearn.metrics import recall_score, confusion_matrix
 from sklearn.model_selection import LeaveOneGroupOut
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from utils import confusion_matrix_plot, prepare_data
 
 
 class TimeseriesDataset(Dataset):
@@ -48,41 +50,80 @@ class TimeseriesDataset(Dataset):
             encoded_labels = encoded_labels.cpu().numpy()
         return [self.idx_to_label[idx] for idx in encoded_labels]
 
+
+class MaskedLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, bidirectional=False):
+        super(MaskedLSTM, self).__init__()
+        self.lstm = nn.LSTM(
+            input_size,
+            hidden_size,
+            batch_first=True,
+            bidirectional=bidirectional
+        )
+
+    def forward(self, x, mask=None):
+        if mask is not None:
+            # Create a packed sequence to handle masking
+            lengths = mask.sum(dim=1).cpu()
+            packed_sequence = nn.utils.rnn.pack_padded_sequence(
+                x, lengths, batch_first=True, enforce_sorted=False
+            )
+            output, (hidden, cell) = self.lstm(packed_sequence)
+            output, _ = nn.utils.rnn.pad_packed_sequence(
+                output, batch_first=True, padding_value=0.0
+            )
+        else:
+            output, (hidden, cell) = self.lstm(x)
+        return output, (hidden, cell)
+
+
 class LSTMModel(nn.Module):
     def __init__(self, input_dim, hidden_dim=128, num_classes=4, bidirectional=False):
         super(LSTMModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.bidirectional = bidirectional
         self.num_directions = 2 if bidirectional else 1
-        
-        self.lstm1 = nn.LSTM(
-            input_dim, 
-            hidden_dim, 
-            batch_first=True,
+
+        self.lstm1 = MaskedLSTM(
+            input_dim,
+            hidden_dim,
             bidirectional=bidirectional
         )
         self.dropout1 = nn.Dropout(0.5)
-        self.lstm2 = nn.LSTM(
-            hidden_dim * self.num_directions, 
+        self.lstm2 = MaskedLSTM(
+            hidden_dim * self.num_directions,
             hidden_dim,
-            batch_first=True,
             bidirectional=bidirectional
         )
         self.dropout2 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(hidden_dim * self.num_directions, 256)
+
+        lstm_output_dim = hidden_dim * self.num_directions
+        self.fc1 = nn.Linear(lstm_output_dim, 256)
         self.dropout3 = nn.Dropout(0.5)
         self.fc2 = nn.Linear(256, num_classes)
         self.relu = nn.ReLU()
-        
-    def forward(self, x):
-        lstm1_out, _ = self.lstm1(x)
+
+    def forward(self, x, mask=None):
+        # Apply masking if provided (zeros in the mask indicate padded values)
+        if mask is None:
+            mask = (x.sum(dim=2) != 0)  # Create mask based on non-zero values
+
+        lstm1_out, _ = self.lstm1(x, mask)
         lstm1_out = self.dropout1(lstm1_out)
-        lstm2_out, _ = self.lstm2(lstm1_out)
-        lstm2_out = self.dropout2(lstm2_out[:, -1, :])  # Take only the last output
-        fc1_out = self.relu(self.fc1(lstm2_out))
+        lstm2_out, (hidden, _) = self.lstm2(lstm1_out, mask)
+
+        # If bidirectional, concatenate the last hidden states from both directions
+        if self.bidirectional:
+            last_hidden = torch.cat((hidden[-2], hidden[-1]), dim=1)
+        else:
+            last_hidden = hidden[-1]
+
+        # Apply dropouts and fully connected layers
+        fc1_out = self.relu(self.fc1(last_hidden))
         fc1_out = self.dropout3(fc1_out)
         out = self.fc2(fc1_out)
         return out
+
 
 class FCDNNModel(nn.Module):
     def __init__(self, input_dim, num_classes=4):
@@ -102,43 +143,6 @@ class FCDNNModel(nn.Module):
         return x
 
 
-def prepare_data(directory, feature_type="dynamic"):
-    print(f'Preparing data from {directory}...')
-
-    features = {}
-    labels = []
-    speakers = []
-    for speaker in range(1, 6):
-        for gender in ['F', 'M']:
-            speaker_id = f"{speaker}{gender}"
-
-            filepath = Path(directory) / feature_type / f"audio_visual_speaker_{speaker_id}.csv"
-            feature_set = pd.read_pickle(filepath)
-            features[speaker_id] = np.vstack([
-                feature_set["features"][idx] for idx in range(feature_set.shape[0])
-            ])
-            if np.isnan(features[speaker_id]).any():
-                print(f"Warning: Null values found in features for speaker {speaker_id}")
-                features = np.nan_to_num(features, nan=0.0)
-            labels.extend([
-                feature_set["UF_label"][idx] for idx in range(feature_set.shape[0])
-            ])
-            speakers.extend([speaker_id] * feature_set.shape[0])
-
-    full_feature_set = np.vstack(list(features.values()))
-
-    data_instances = len(labels)
-    sequence_length = int(full_feature_set.shape[0] / data_instances)
-    feature_dimension = 895
-
-    if feature_type == "dynamic":
-        full_feature_set = full_feature_set.reshape(
-            data_instances, sequence_length, feature_dimension
-        )
-
-    return full_feature_set, np.asarray(labels), np.asarray(speakers)
-
-
 class RunDeepLearning:
     """
     This class will run the deep learning algorithms, LSTM/BiLSTM/FC-DNN
@@ -153,7 +157,9 @@ class RunDeepLearning:
         running_loss = 0.0
         for features, labels in tqdm(train_loader):
             features, labels = features.to(self.device), labels.to(self.device)
-            
+            # print(features.shape)
+            # print(labels.shape)
+
             optimizer.zero_grad()
             outputs = model(features)
             loss = criterion(outputs, labels)
@@ -207,7 +213,7 @@ class RunDeepLearning:
                 
         return model
 
-    def run_model(self, features, labels, speaker_id, model_type="lstm", bidirectional=False):
+    def run_model(self, features, labels, speaker_ids, model_type="lstm", bidirectional=False):
         logo = LeaveOneGroupOut()
         predict_probability = {}
         test_GT = {}
@@ -219,7 +225,9 @@ class RunDeepLearning:
 
         # leave-one-out cross validation
         speaker = 0
-        for train_idx, test_idx in logo.split(features, labels, speaker_id):
+        for train_idx, test_idx in logo.split(features, labels, speaker_ids):
+            print(f'\n******** Cross-validating speaker {speaker}... ********')
+
             # Create the dataset
             dataset = TimeseriesDataset(features, labels)
 
@@ -292,6 +300,19 @@ class RunDeepLearning:
         return test_GT, model_pred, predict_probability, confusion_matrices, unweighted_recall
 
 
-features, label, speaker_group = prepare_data(directory='Files/UF_His_data/step_1')
-forecast = RunDeepLearning()
-forecast.run_model(features, label, speaker_group)
+if __name__ == "__main__":
+    features, labels, speaker_group = prepare_data(directory='Files/UF_His_data/step_1')
+    forecast = RunDeepLearning()
+    test_gt, pred, pred_prob, confusion_matrices, uw_recall = forecast.run_model(
+        features, labels, speaker_group, model_type='lstm', bidirectional=False
+    )
+
+    all_recall = []
+    for i, speaker in enumerate(list(dict.fromkeys(speaker_group))):
+        confusion_matrix_plot(
+            str(speaker), test_gt[i], pred[i],
+            ['Anger', 'Happy', 'Neutral', 'Sad'], normalize=False
+        )
+        all_recall.append(recall_score(test_gt[i], pred[i], average='macro'))
+
+    print('Average UWR:', np.mean(all_recall * 100))

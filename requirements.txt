@@ -4,3 +4,4 @@ torch
 matplotlib
 scipy
 scikit-learn
+uni2ts
