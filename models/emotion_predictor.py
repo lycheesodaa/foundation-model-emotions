@@ -125,18 +125,18 @@ class EmotionPredictor:
             self,
             train_loader: torch.utils.data.DataLoader,
             optimizer: torch.optim.Optimizer,
-            criterion: nn.Module
+            criterion: nn.Module,
+            accumulation_steps: int = 1
     ) -> float:
         self.model.train()
         total_loss = 0.0
+        optimizer.zero_grad()
 
-        for batch in tqdm(train_loader, total=len(train_loader)):
+        for idx, batch in tqdm(enumerate(train_loader), total=len(train_loader)):
             features, emotion_labels = [b.to(self.device) for b in batch]
 
             # Prepare input tensors
             past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
-
-            optimizer.zero_grad()
 
             # Forward pass
             _, emotion_logits = self.model(
@@ -146,17 +146,23 @@ class EmotionPredictor:
             )
 
             # Calculate loss
-            loss = criterion(emotion_logits, emotion_labels)
+            loss = criterion(emotion_logits, emotion_labels) / accumulation_steps
 
             # Backward pass
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
             optimizer.step()
 
-            total_loss += loss.item()
+            total_loss += loss.item() * accumulation_steps
+
+            # Only update weights after accumulating enough gradients
+            if (idx + 1) % accumulation_steps == 0 or (idx + 1) == len(train_loader):
+                optimizer.step()
+                optimizer.zero_grad()
 
         return total_loss / len(train_loader)
 
+    @torch.no_grad()
     def validate(
             self,
             val_loader: torch.utils.data.DataLoader,
@@ -164,11 +170,12 @@ class EmotionPredictor:
     ) -> Tuple[float, float]:
         self.model.eval()
         total_loss = 0.0
-        total_UWR = 0.0
+        all_pred = []
+        all_true = []
 
         with torch.no_grad():
             for batch in tqdm(val_loader, total=len(val_loader)):
-                features, emotion_labels = batch[0].to(self.device), batch[1].to(self.device)
+                features, emotion_labels = [b.to(self.device) for b in batch]
 
                 # Prepare input tensors
                 past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
@@ -186,10 +193,18 @@ class EmotionPredictor:
 
                 # Calculate accuracy
                 _, predicted = torch.max(emotion_logits.data, 1)
-                total_UWR += recall_score(emotion_labels, predicted, average='macro')
 
-        return total_loss / len(val_loader), total_UWR / len(val_loader)
+                all_true.append(emotion_labels)
+                all_pred.append(predicted)
 
+            all_true = torch.cat(all_true)
+            all_pred = torch.cat(all_pred)
+
+            recall = recall_score(all_true.cpu(), all_pred.cpu(), average='macro')
+
+        return total_loss / len(val_loader), recall
+
+    @torch.no_grad()
     def predict(
             self,
             features: torch.Tensor,

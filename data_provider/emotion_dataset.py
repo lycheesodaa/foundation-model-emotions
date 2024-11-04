@@ -15,6 +15,10 @@ class EmotionDataset(Dataset):
         encoded_labels = [self.label_to_idx[label] for label in labels]
         self.labels = torch.LongTensor(encoded_labels)
 
+        # For testing
+        # self.features = self.features[:5]
+        # self.labels = self.labels[:5]
+
         # Store number of classes
         self.num_classes = len(unique_labels)
 

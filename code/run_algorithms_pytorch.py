@@ -1,3 +1,6 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,9 +9,9 @@ from sklearn.metrics import recall_score, confusion_matrix
 from sklearn.model_selection import LeaveOneGroupOut
 from tqdm import tqdm
 
-from models.dnn import LSTMModel, FCDNNModel
-from utils.utils import confusion_matrix_plot, prepare_data
-from data_provider.emotion_dataset import EmotionDataset
+from ..models.dnn import LSTMModel, FCDNNModel
+from ..utils.utils import confusion_matrix_plot, prepare_data
+from ..data_provider.emotion_dataset import EmotionDataset
 
 
 class RunDeepLearning:
