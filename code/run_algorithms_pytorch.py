@@ -1,6 +1,7 @@
 import sys, os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+from pathlib import Path
+import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
@@ -9,9 +10,9 @@ from sklearn.metrics import recall_score, confusion_matrix
 from sklearn.model_selection import LeaveOneGroupOut
 from tqdm import tqdm
 
-from ..models.dnn import LSTMModel, FCDNNModel
-from ..utils.utils import confusion_matrix_plot, prepare_data
-from ..data_provider.emotion_dataset import EmotionDataset
+from models.dnn import LSTMModel, FCDNNModel
+from utils.utils import confusion_matrix_plot, prepare_data
+from data_provider.emotion_dataset import EmotionDataset
 
 
 class RunDeepLearning:
@@ -19,14 +20,14 @@ class RunDeepLearning:
     This class will run the deep learning algorithms, LSTM/BiLSTM/FC-DNN
     from the speaker-wise processed data
     """
-    def __init__(self, device='cuda' if torch.cuda.is_available() else 'cpu'):
+    def __init__(self, device='cuda:2' if torch.cuda.is_available() else 'cpu'):
         self.device = device
         self.max_grad_norm = 1.0  # For gradient clipping
 
     def train_epoch(self, model, train_loader, criterion, optimizer):
         model.train()
         running_loss = 0.0
-        for features, labels in tqdm(train_loader):
+        for features, _, labels in tqdm(train_loader):
             features, labels = features.to(self.device), labels.to(self.device)
             # print(features.shape)
             # print(labels.shape)
@@ -47,7 +48,7 @@ class RunDeepLearning:
         total = 0
 
         with torch.no_grad():
-            for features, labels in val_loader:
+            for features, _, labels in val_loader:
                 features, labels = features.to(self.device), labels.to(self.device)
                 outputs = model(features)
                 loss = criterion(outputs, labels)
@@ -84,7 +85,8 @@ class RunDeepLearning:
                 
         return model
 
-    def run_model(self, features, labels, speaker_ids, model_type="lstm", bidirectional=False):
+    def run_model(self, features, next_features, labels, speaker_ids,
+                  model_type="lstm", bidirectional=False, batch_size=32):
         logo = LeaveOneGroupOut()
         predict_probability = {}
         test_GT = {}
@@ -99,19 +101,16 @@ class RunDeepLearning:
         for train_idx, test_idx in logo.split(features, labels, speaker_ids):
             print(f'\n******** Cross-validating speaker {speaker}... ********')
 
-            # Create the dataset
-            dataset = EmotionDataset(features, labels)
-
             if model_type == "lstm":
                 model = LSTMModel(
                     input_dim=input_dim,
-                    num_classes=dataset.num_classes,
+                    num_classes=len(set(labels)),
                     bidirectional=bidirectional
                 ).to(self.device)
             else:
                 model = FCDNNModel(
                     input_dim=input_dim,
-                    num_classes=dataset.num_classes
+                    num_classes=len(set(labels))
                 ).to(self.device)
 
             # Create train/val split from training data
@@ -119,22 +118,21 @@ class RunDeepLearning:
             train_subset = train_idx[:train_size]
             val_subset = train_idx[train_size:]
 
-            # Create samplers for each set
-            train_sampler = SubsetRandomSampler(train_subset)
-            val_sampler = SubsetRandomSampler(val_subset)
-            test_sampler = SubsetRandomSampler(test_idx)
-
             # Create data loaders
             train_loader = DataLoader(
-                dataset, batch_size=128, sampler=train_sampler
+                EmotionDataset(features[train_subset], next_features[train_subset], labels[train_subset], verbose=True),
+                batch_size=batch_size,
+                shuffle=True
             )
             val_loader = DataLoader(
-                dataset, batch_size=128, sampler=val_sampler
+                EmotionDataset(features[val_subset], next_features[val_subset], labels[val_subset]),
+                batch_size=batch_size
             )
             test_loader = DataLoader(
-                dataset, batch_size=128, sampler=test_sampler
+                EmotionDataset(features[test_idx], next_features[test_idx], labels[test_idx]),
+                batch_size=batch_size
             )
-            
+
             # Train the model
             model = self.train_model(model, train_loader, val_loader)
             
@@ -144,7 +142,7 @@ class RunDeepLearning:
             test_labels = []
             
             with torch.no_grad():
-                for features_batch, labels_batch in test_loader:
+                for features_batch, _, labels_batch in test_loader:
                     features_batch = features_batch.to(self.device)
                     outputs = model(features_batch)
                     probabilities = torch.softmax(outputs, dim=1)
@@ -171,19 +169,41 @@ class RunDeepLearning:
         return test_GT, model_pred, predict_probability, confusion_matrices, unweighted_recall
 
 
+def export_results(probabilities, pred_labels, ground_truths, speaker, model, is_bidirectional):
+    if is_bidirectional and model == 'lstm':
+        model = 'bilstm'
+
+    export_path = Path(f'results/{model}/')
+    export_path.mkdir(parents=True, exist_ok=True)
+
+    pd.DataFrame.from_dict({
+        'probabilities': [probabilities],
+        'pred_labels': [pred_labels],
+        'true_labels': [ground_truths]
+    }).to_pickle(export_path / f'results_speaker_{speaker}')
+
+
 if __name__ == "__main__":
-    features, labels, speaker_group = prepare_data(directory='Files/UF_His_data/step_1')
+    model = 'lstm'
+    is_bidirectional=False
+
+    features, next_features, labels, speaker_group = prepare_data(
+        directory='Files/UF_His_data/step_1_mean', mean_only=True)
     forecast = RunDeepLearning()
+
     test_gt, pred, pred_prob, confusion_matrices, uw_recall = forecast.run_model(
-        features, labels, speaker_group, model_type='lstm', bidirectional=False
+        features, next_features, labels, speaker_group, model_type=model, bidirectional=is_bidirectional
     )
 
     all_recall = []
     for i, speaker in enumerate(list(dict.fromkeys(speaker_group))):
         confusion_matrix_plot(
             str(speaker), test_gt[i], pred[i],
-            ['Anger', 'Happy', 'Neutral', 'Sad'], normalize=False
+            ['Anger', 'Happy', 'Neutral', 'Sad'], normalize=False,
+            savedir=f'Images/lstm'
         )
         all_recall.append(recall_score(test_gt[i], pred[i], average='macro'))
+
+        export_results(pred_prob[i], pred[i], test_gt[i], speaker, model, is_bidirectional)
 
     print('Average UWR:', np.mean(all_recall * 100))

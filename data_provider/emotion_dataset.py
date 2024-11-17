@@ -3,8 +3,9 @@ from torch.utils.data import Dataset
 
 class EmotionDataset(Dataset):
     """Custom Dataset for loading the audiovisual features"""
-    def __init__(self, features, labels, verbose=False):
+    def __init__(self, features, next_features, labels, verbose=False):
         self.features = torch.FloatTensor(features)
+        self.next_features = torch.FloatTensor(next_features)
 
         # Create label encoder
         unique_labels = sorted(set(labels))
@@ -24,6 +25,7 @@ class EmotionDataset(Dataset):
 
         if verbose:
             print('Dataset shape:', self.features.shape)
+            print('Dataset shape:', self.next_features.shape)
 
             # Print the label mapping
             print("Label Encoding Mapping:")
@@ -38,7 +40,7 @@ class EmotionDataset(Dataset):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        return self.features[idx], self.labels[idx]
+        return self.features[idx], self.next_features[idx], self.labels[idx]
 
     def decode_labels(self, encoded_labels):
         """Convert numeric labels back to original string labels"""

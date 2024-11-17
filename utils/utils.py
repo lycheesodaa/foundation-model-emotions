@@ -114,16 +114,22 @@ def prepare_data(directory, feature_type="dynamic", mean_only=False, verbose=Fal
     print(f'Preparing data from {directory}...')
 
     features = {}
+    next_features = {}
     labels = []
     speakers = []
     for speaker in range(1, 6):
         for gender in ['F', 'M']:
             speaker_id = f"{speaker}{gender}"
+            if verbose:
+                print(f'Preparing speaker {speaker_id}')
 
-            filepath = Path(directory) / feature_type / f"audio_visual_speaker_{speaker_id}.csv"
+            filepath = Path(directory) / f'{feature_type}_next' / f"audio_visual_speaker_{speaker_id}.csv"
             feature_set = pd.read_pickle(filepath)
             features[speaker_id] = np.vstack([
                 feature_set["features"][idx] for idx in range(feature_set.shape[0])
+            ])
+            next_features[speaker_id] = np.vstack([
+                feature_set["next_features"][idx] for idx in range(feature_set.shape[0])
             ])
             labels.extend([
                 feature_set["UF_label"][idx] for idx in range(feature_set.shape[0])
@@ -131,14 +137,19 @@ def prepare_data(directory, feature_type="dynamic", mean_only=False, verbose=Fal
             speakers.extend([speaker_id] * feature_set.shape[0])
 
     full_feature_set = np.vstack(list(features.values()))
+    full_next_feature_set = np.vstack(list(next_features.values()))
 
     data_instances = len(labels)
     sequence_length = int(full_feature_set.shape[0] / data_instances)
+    next_sequence_length = int(full_next_feature_set.shape[0] / data_instances)
     feature_dimension = 179 if mean_only else 895
 
     if feature_type == "dynamic":
         full_feature_set = full_feature_set.reshape(
             data_instances, sequence_length, feature_dimension
+        )
+        full_next_feature_set = full_next_feature_set.reshape(
+            data_instances, next_sequence_length, feature_dimension
         )
 
     if verbose:
@@ -147,4 +158,4 @@ def prepare_data(directory, feature_type="dynamic", mean_only=False, verbose=Fal
         temp = pd.concat([temp, pd.DataFrame(speakers, columns=['speakers'])], axis=1)
         print(temp.groupby('speakers')['labels'].value_counts())
 
-    return full_feature_set, np.asarray(labels), np.asarray(speakers)
+    return full_feature_set, full_next_feature_set, np.asarray(labels), np.asarray(speakers)

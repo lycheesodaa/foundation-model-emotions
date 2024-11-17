@@ -1,8 +1,9 @@
-import os
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 import numpy as np
 import pandas as pd
@@ -81,20 +82,23 @@ class UtteranceDataProcessor:
     def save_processed_data(self,
                             data: Dict[str, pd.DataFrame],
                             utt_lengths: List[int],
+                            next_utt_lengths: List[int],
                             step: int,
                             feature_type: str = "dynamic",
                             mean_only=False) -> None:
         """Save processed data efficiently."""
         if mean_only:
-            output_base = self.base_path / f"{self.data_dir}/step_{step}_mean/{feature_type}"
+            output_base = self.base_path / f"{self.data_dir}/step_{step}_mean/{feature_type}_next"
         else:
             output_base = self.base_path / f"{self.data_dir}/step_{step}/{feature_type}"
 
         output_base.mkdir(parents=True, exist_ok=True)
         
         max_length = max(utt_lengths)
+        max_next_length = max(next_utt_lengths) # this will be our prediction length for Moirai
         print(f'Total of {len(utt_lengths)} valid utterances.')
         print(f'Padding to length {max_length} windows per utterance.')
+        print(f'Padding to length {max_next_length} windows per next utterance.')
 
         for speaker_id, df in data.items():
             print(f"Saving data for speaker {speaker_id}...")
@@ -103,12 +107,16 @@ class UtteranceDataProcessor:
                     lambda x: np.pad(x, ((0, max_length - x.shape[0]), (0, 0)),
                                    mode='constant')
                 )
+                df['next_features'] = df['next_features'].apply(
+                    lambda x: np.pad(x, ((0, max_next_length - x.shape[0]), (0, 0)),
+                                   mode='constant')
+                )
             
             output_path = output_base / f"audio_visual_speaker_{speaker_id}.csv"
             df.to_pickle(output_path)
 
 class UFCurrentDataProcessor(UtteranceDataProcessor):
-    """Process current utterance forecasting data."""
+    """Process current utterance forecasting data. (Not in use)"""
     
     def __init__(self):
         super().__init__(data_dir="UF_Cur_data")
@@ -141,14 +149,16 @@ class UFCurrentDataProcessor(UtteranceDataProcessor):
                     current_name = audio_data['name'].iloc[idx]
                     target_name = audio_data['name'].iloc[idx + step]
                     
-                    if (current_name[:-5] == target_name[:-5] and 
-                        audio_data['label'].iloc[idx + step] is not None):
+                    # Skip if invalid label or not in same dialog
+                    if (~pd.isna(audio_data['label'].iloc[idx + step])
+                        and current_name[:-5] == target_name[:-5]):
                         
                         utt_lengths.append(audio_data['stat_features'].iloc[idx].shape[0])
-                        
+
                         uf_data.append({
                             'current_name': current_name,
                             'features': audio_data['stat_features'].iloc[idx],
+                            'next_features': audio_data['stat_features'].iloc[idx + step],
                             'UF_label': audio_data['label'].iloc[idx + step],
                             'forecasted_utt_name': target_name,
                             'time_distance': self.calculate_time_distance(
@@ -161,7 +171,8 @@ class UFCurrentDataProcessor(UtteranceDataProcessor):
                 
                 if normalize:
                     uf_df['features'] = self.normalize_features(uf_df['features'].tolist())
-                
+                    uf_df['next_features'] = self.normalize_features(uf_df['next_features'].tolist())
+
                 speaker_data[speaker_id] = uf_df
         
         return speaker_data, utt_lengths
@@ -176,11 +187,12 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
     def process_dataset(self, step: int = 0,
                         feature_type: str = "dynamic",
                         normalize: bool = False,
-                        mean_only=False) -> tuple[dict[str, DataFrame], list[Any]]:
+                        mean_only=False) -> tuple[dict[str, DataFrame], list[int], list[Any]]:
         """Process the historical dataset with optimized operations."""
         print('Processing Historical Data...')
         speaker_data = {}
         utt_lengths = []
+        next_utt_lengths = []
         lookup_table = self.parse_iemocap_info()
         
         for speaker in range(1, 6):
@@ -200,7 +212,7 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
                     current_name = audio_data['name'].iloc[idx]
                     target_name = audio_data['name'].iloc[idx + step]
 
-                    # Skip if not in same dialog or invalid label
+                    # Skip if invalid label or not in same dialog
                     if (pd.isna(audio_data['label'].iloc[idx + step])
                         or current_name[:-5] != target_name[:-5]):
                         continue
@@ -218,30 +230,36 @@ class UFHistoryDataProcessor(UtteranceDataProcessor):
 
                     # assert _validate_features(features), f'feature vectors have nulls'
 
+                    # calculate the time distance between the utterances, and omit if <0
+                    time_distance = self.calculate_time_distance(
+                        lookup_table, current_name, target_name
+                    )
+                    if time_distance <= 0:
+                        continue
+
                     utt_lengths.append(features.shape[0])
+                    next_utt_lengths.append(audio_data['stat_features'].iloc[idx + step].shape[0])
                     uf_data.append({
                         'current_name': current_name,
                         'features': features,
+                        'next_features': audio_data['stat_features'].iloc[idx + step],
                         'UF_label': audio_data['label'].iloc[idx + step],
                         'forecasted_utt_name': target_name,
-                        'time_distance': self.calculate_time_distance(
-                            lookup_table, current_name, target_name
-                        )
+                        'time_distance': time_distance
                     })
-                
+
                 uf_df = pd.DataFrame(uf_data)
 
                 # Check for null values with detailed reporting
                 check_null_values(uf_df, speaker_id)
 
-                # assert uf_df.notnull().all().all(), f"Null values found in {speaker_id} data"
-                
                 if normalize:
                     uf_df['features'] = self.normalize_features(uf_df['features'].tolist())
-                
+                    uf_df['next_features'] = self.normalize_features(uf_df['next_features'].tolist())
+
                 speaker_data[speaker_id] = uf_df
         
-        return speaker_data, utt_lengths
+        return speaker_data, utt_lengths, next_utt_lengths
 
 def main():
     """Main function to run the data processing."""
@@ -256,8 +274,8 @@ def main():
     
     # Process historical utterance data
     uf_his = UFHistoryDataProcessor()
-    his_data, his_lengths = uf_his.process_dataset(step=1, normalize=True, mean_only=True)
-    uf_his.save_processed_data(his_data, his_lengths, step=1, mean_only=True)
+    his_data, his_lengths, next_his_lengths = uf_his.process_dataset(step=1, normalize=True, mean_only=True)
+    uf_his.save_processed_data(his_data, his_lengths, next_his_lengths, step=1, mean_only=True)
 
 if __name__ == "__main__":
     main()

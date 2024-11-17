@@ -1,14 +1,17 @@
-from typing import Optional, Tuple
-
 import torch
 import torch.nn as nn
-from jaxtyping import Float, Bool
+from typing import Optional, Tuple
+import numpy as np
 from sklearn.metrics import recall_score
+from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
+from jaxtyping import Float, Bool
 from tqdm import tqdm
-from uni2ts.model.moirai import MoiraiForecast, MoiraiModule
+from uni2ts.loss.packed import PackedMSELoss
+from uni2ts.model.moirai import MoiraiForecast, MoiraiModule, MoiraiFinetune
 
 
-class EmotionForecastModel(nn.Module):
+class EmotionForecastSVMModel(nn.Module):
     def __init__(
             self,
             prediction_length: int,
@@ -17,12 +20,12 @@ class EmotionForecastModel(nn.Module):
             past_feat_dynamic_real_dim: int,
             context_length: int,
             num_emotions: int,
-            hidden_dim: int = 256,
             module_kwargs: Optional[dict] = None,
             module: Optional[MoiraiModule] = MoiraiModule.from_pretrained(f"Salesforce/moirai-1.0-R-base"),
             patch_size: int | str = "auto",
             num_samples: int = 100,
-            freeze_backbone: bool = False
+            svm_kernel: str = 'rbf',
+            svm_C: float = 1.0,
     ):
         super().__init__()
 
@@ -37,22 +40,18 @@ class EmotionForecastModel(nn.Module):
             module=module,
             patch_size=patch_size,
             num_samples=num_samples
-        )
+        ).requires_grad_(False)
 
-        if freeze_backbone:
-            self.moirai.requires_grad_(False)
-            print('Frozen Moirai backbone.')
-
-        # Emotion classification head
-        self.classification_head = nn.Sequential(
-            nn.Linear(prediction_length * target_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(hidden_dim // 2, num_emotions)
+        # Initialize SVM classifier
+        self.svm = SVC(
+            kernel=svm_kernel,
+            C=svm_C,
+            probability=True  # Enable probability estimates
         )
+        self.scaler = StandardScaler()
+
+        # Flag to track if SVM has been fitted
+        self.is_svm_fitted = False
 
     def forward(
             self,
@@ -63,7 +62,7 @@ class EmotionForecastModel(nn.Module):
             observed_feat_dynamic_real: Optional[Float[torch.Tensor, "batch time feat"]] = None,
             past_feat_dynamic_real: Optional[Float[torch.Tensor, "batch past_time past_feat"]] = None,
             past_observed_feat_dynamic_real: Optional[Float[torch.Tensor, "batch past_time past_feat"]] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         # Get predictions from MOIRAI
         # ! forecast function is modified to return mean instead of sampling from distr.
         forecasts = self.moirai(
@@ -75,22 +74,44 @@ class EmotionForecastModel(nn.Module):
             past_feat_dynamic_real=past_feat_dynamic_real,
             past_observed_feat_dynamic_real=past_observed_feat_dynamic_real,
         )
-        # print(forecasts.shape)
 
-        # Flatten the forecasts for classification
+        # Flatten the forecasts
         batch_size = forecasts.shape[0]
         flattened_forecasts = forecasts.reshape(batch_size, -1)
 
-        # Get emotion predictions
-        emotion_logits = self.classification_head(flattened_forecasts)
+        # During training, we don't use the SVM here
+        # SVM predictions are handled separately in the EmotionPredictor class
+        return forecasts, flattened_forecasts
 
-        return forecasts, emotion_logits
+    def fit_svm(self, features: np.ndarray, labels: np.ndarray):
+        """Fit the SVM classifier on the given features and labels"""
+        # Scale the features
+        scaled_features = self.scaler.fit_transform(features)
+
+        # Fit the SVM
+        self.svm.fit(scaled_features, labels)
+        self.is_svm_fitted = True
+
+    def predict_svm(self, features: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Get SVM predictions and probabilities"""
+        if not self.is_svm_fitted:
+            raise RuntimeError("SVM must be fitted before making predictions")
+
+        # Scale the features
+        scaled_features = self.scaler.transform(features)
+
+        # Get predictions and probabilities
+        predictions = self.svm.predict(scaled_features)
+        probabilities = self.svm.predict_proba(scaled_features)
+
+        return predictions, probabilities
 
 
-class EmotionPredictor:
+
+class EmotionPredictorSVM:
     def __init__(
             self,
-            model: EmotionForecastModel,
+            model: EmotionForecastSVMModel,
             device: torch.device,
             batch_size: int = 32,
     ):
@@ -99,30 +120,10 @@ class EmotionPredictor:
         self.batch_size = batch_size
 
     def prepare_input_tensors(self, features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
-        Prepare input tensors for the MOIRAI model with proper masking of zero values.
-
-        Args:
-            features: Input features tensor of shape (batch_size, sequence_length, feature_dim)
-
-        Returns:
-            tuple of:
-                - past_target: The feature values
-                - past_observed_target: Boolean mask indicating non-zero values
-                - past_is_pad: Boolean mask indicating padding at sequence level
-        """
-        # The features tensor will be used directly as past_target
         past_target = features
-
-        # Create mask for non-zero values across all feature dimensions
-        # If any feature dimension is non-zero, we consider that timestep as observed
         past_observed_target = (features != 0.0)
         # past_observed_target = torch.ones_like(features, dtype=torch.bool)
-
-        # For sequence-level padding, we consider a timestep padded if all features are zero
-        # Shape: (batch_size, sequence_length)
         past_is_pad = (features.sum(dim=2) == 0)
-
         return past_target, past_observed_target, past_is_pad
 
     def train_epoch(
@@ -130,9 +131,14 @@ class EmotionPredictor:
             train_loader: torch.utils.data.DataLoader,
             optimizer: torch.optim.Optimizer,
             criterion: nn.Module,
-            criterion2: nn.Module = None,
             accumulation_steps: int = 1
     ) -> float:
+        """
+        Training epoch for SVM-based model.
+
+        We only train the model based on the next_features with e.g. MSELoss, and fit the SVM later on with the best
+        performing model based on validation performance.
+        """
         self.model.train()
         total_loss = 0.0
         optimizer.zero_grad()
@@ -143,15 +149,14 @@ class EmotionPredictor:
             # Prepare input tensors
             past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
 
-            # Forward pass
-            forecasts, emotion_logits = self.model(
+            # Forward pass through MOIRAI only
+            forecasts, _ = self.model(
                 past_target=past_target,
                 past_observed_target=past_observed_target,
                 past_is_pad=past_is_pad
             )
 
-            # Calculate loss
-            loss = criterion(emotion_logits, emotion_labels) /  accumulation_steps
+            loss = criterion(forecasts, next_features) / accumulation_steps
 
             # Backward pass
             loss.backward()
@@ -170,49 +175,74 @@ class EmotionPredictor:
             self,
             val_loader: torch.utils.data.DataLoader,
             criterion: nn.Module,
-            criterion2: nn.Module = None,
     ) -> Tuple[float, float]:
+        """
+        Validation for SVM-based model
+        """
         self.model.eval()
         total_loss = 0.0
-        all_pred = []
-        all_true = []
 
         with torch.no_grad():
-            for batch in tqdm(val_loader, total=len(val_loader)):
+            for idx, batch in tqdm(enumerate(val_loader), total=len(val_loader)):
                 features, next_features, emotion_labels = [b.to(self.device) for b in batch]
 
                 # Prepare input tensors
                 past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
 
-                # Forward pass
-                forecasts, emotion_logits = self.model(
+                # Forward pass through MOIRAI only
+                forecasts, _ = self.model(
                     past_target=past_target,
                     past_observed_target=past_observed_target,
                     past_is_pad=past_is_pad
                 )
 
-                # Calculate loss
-                loss = criterion(emotion_logits, emotion_labels)
+                loss = criterion(forecasts, next_features)
                 total_loss += loss.item()
 
-                # Calculate accuracy
-                _, predicted = torch.max(emotion_logits.data, 1)
+        return total_loss / len(val_loader), 0.0
 
-                all_true.append(emotion_labels)
-                all_pred.append(predicted)
+    def fit_svm_on_best_model(
+            self,
+            train_loader: torch.utils.data.DataLoader
+    ) -> None:
+        """
+        Training epoch for SVM-based model. Collects MOIRAI features for SVM training.
+        """
+        print("Fitting SVM on best model...")
+        self.model.eval()
+        all_features = []
+        all_labels = []
 
-            all_true = torch.cat(all_true)
-            all_pred = torch.cat(all_pred)
+        for batch in tqdm(train_loader, total=len(train_loader)):
+            features, next_features, emotion_labels = [b.to(self.device) for b in batch]
 
-            recall = recall_score(all_true.cpu(), all_pred.cpu(), average='macro')
+            # Prepare input tensors
+            past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
 
-        return total_loss / len(val_loader), recall
+            # Forward pass through MOIRAI only
+            _, flattened_forecasts = self.model(
+                past_target=past_target,
+                past_observed_target=past_observed_target,
+                past_is_pad=past_is_pad
+            )
 
-    @torch.no_grad()
+            # Collect features and labels for SVM
+            all_features.append(flattened_forecasts.cpu().detach().numpy())
+            all_labels.extend(emotion_labels.cpu().numpy())
+
+        # Concatenate all features and fit SVM
+        features_array = np.concatenate(all_features, axis=0)
+        labels_array = np.array(all_labels)
+        self.model.fit_svm(features_array, labels_array)
+        print("SVM fitted.")
+
     def predict(
             self,
             features: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Get predictions from both MOIRAI and SVM
+        """
         self.model.eval()
 
         with torch.no_grad():
@@ -220,12 +250,15 @@ class EmotionPredictor:
             past_target, past_observed_target, past_is_pad = self.prepare_input_tensors(features)
 
             # Get predictions
-            forecasts, emotion_logits = self.model(
+            forecasts, flattened_forecasts = self.model(
                 past_target=past_target,
                 past_observed_target=past_observed_target,
                 past_is_pad=past_is_pad
             )
 
-            emotion_probs = torch.softmax(emotion_logits, dim=1)
+            # Get SVM predictions
+            _, probabilities = self.model.predict_svm(
+                flattened_forecasts.cpu().numpy()
+            )
 
-        return forecasts.cpu(), emotion_probs.cpu()
+        return forecasts.cpu(), torch.from_numpy(probabilities)

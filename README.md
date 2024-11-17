@@ -16,6 +16,10 @@ The process flow is as follows:
   - `dnn.py` contains the deep neural networking related models.
 - All tests rely on the `data_provider/emotion_dataset.py` PyTorch Dataset file for data-loading purposes.
 
+*Note:* The MoiraiForecast implementation has to be modified slightly to return a mean of the distribution instead of sampling from it. 
+The modified version is provided in `code/edited_forecast.py`. Replace the `uni2ts/model/moirai/forecast.py` code with the provided version. 
+- Alternatively, if you do not wish to change the source code, it may be possible to sample a large enough sample size from the distribution and obtain the mean from the resulting tensor (though this has not been tested). 
+
 ---
 ## Emotion-Forecasting *(From the original repository)*
 

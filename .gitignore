@@ -2,6 +2,9 @@
 /Files
 /*/__pycache__
 /venv
+/Images
+/results
+/checkpoints
 
 Praat.exe
 test.ipynb
