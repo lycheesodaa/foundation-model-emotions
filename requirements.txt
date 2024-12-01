@@ -5,3 +5,4 @@ matplotlib
 scipy
 scikit-learn
 uni2ts
+transformers
